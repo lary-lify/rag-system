@@ -1,0 +1,55 @@
+# ========================================
+# rag-kb-system backend dependencies
+# Python 3.11+
+# ========================================
+
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+sse-starlette>=2.1.3
+
+# Database - async MySQL
+sqlalchemy[asyncio]>=2.0.36
+aiomysql>=0.2.0
+pymysql>=1.1.1
+
+# Auth & security
+bcrypt>=4.0.0
+PyJWT>=2.9.0
+cryptography>=43.0.0
+
+# Vector DB - Milvus
+pymilvus>=2.5.5
+
+# LLM APIs
+httpx>=0.27.0
+openai>=1.54.0  # Compatible client for Tongyi + DeepSeek
+
+# File parsing (dedicated libs per format; unstructured dropped: not py3.13 compatible)
+PyPDF2>=3.0.0
+python-docx>=1.1.0
+python-pptx>=1.0.0
+
+# Data export
+openpyxl>=3.1.5
+pandas>=2.2.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.10.0
+pydantic-settings>=2.5.0
+
+# Redis (optional, for future rate-limit / cache)
+redis>=5.0.0
+
+# Rate limiting
+slowapi>=0.1.9
+
+# Task scheduling
+schedule>=1.2.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0

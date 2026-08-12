@@ -1,0 +1,104 @@
+# ============================================================
+# RAG-KB-System 分层 .gitignore
+# 适用：FastAPI 后端(Python) + Vue3 前端(Node) + AI 模型/数据集
+# 原则：真实密钥一律忽略，仅保留 .example / .template 模板
+# ============================================================
+
+# ---------- 1. 密钥与环境变量（最高优先级，绝对不能上传） ----------
+# 忽略所有真实环境文件（含 .env / .env.local / .env.docker 等）
+.env
+.env.*
+# 但保留不带密钥的模板文件（供协作与部署参考）
+!.env.example
+!.env.template
+# 其它敏感凭证兜底
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+
+# ---------- 2. Python 后端（backend/） ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.log
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+backend/data/crawls/*
+!backend/data/crawls/.gitkeep
+
+# ---------- 3. Node 前端（frontend/） ----------
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.eslintcache
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- 4. AI 模型 / 数据集 / 大文件 ----------
+# 若已配置 Git LFS（见上传流程文档第 8 节），这些类型会被 LFS 接管，无需在此忽略。
+# 若决定完全不上传大模型/视频/压缩包，取消下方注释即可：
+# *.bin
+# *.gguf
+# *.pt
+# *.pth
+# *.ckpt
+# *.safetensors
+# *.onnx
+# *.mp4
+# *.avi
+# *.mov
+# *.mkv
+# *.zip
+# *.tar
+# *.tar.gz
+# *.rar
+# *.7z
+# models/
+# datasets/
+
+# ---------- 5. 运行时 / 日志 / 本地数据库 ----------
+logs/
+*.sqlite3
+*.db
+*.sql.bak
+.DS_Store
+Thumbs.db
+
+# ---------- 6. IDE / 编辑器 ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# ---------- 7. Docker 卷（本地产物，非源码） ----------
+docker-data/
+*.volume
+
+# ---------- 8. 操作系统 ----------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
