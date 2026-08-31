@@ -93,6 +93,46 @@ class Settings(BaseSettings):
     RAG_SCORE_THRESHOLD: float = 0.3
     RAG_RETRIEVE_MODE: Literal["vector", "keyword", "mix"] = "mix"  # type: ignore[assignment]
 
+    # ---- Deployment / 进程模型 ----
+    # gunicorn worker 数。连接池容量按 worker 数推算，多副本部署时必须与实际一致，
+    # 否则会放大 MySQL 连接数（worker 数 x 单 worker 池上限）。
+    APP_WORKERS: int = 1
+
+    # ---- MySQL 连接池 ----
+    DB_POOL_SIZE_PER_WORKER: int = 5
+    DB_MAX_OVERFLOW_PER_WORKER: int = 10
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_PRE_PING: bool = True
+
+    # ---- 共享 HTTP 连接池（DeepSeek / Tongyi 等外部 API） ----
+    HTTP_MAX_CONNECTIONS: int = 200
+    HTTP_MAX_KEEPALIVE: int = 50
+    HTTP_KEEPALIVE_EXPIRY: float = 30.0
+    HTTP_CONNECT_TIMEOUT: float = 5.0
+    HTTP_READ_TIMEOUT: float = 60.0
+
+    # ---- Milvus ----
+    # pymilvus 是同步客户端，调用统一丢线程池，池大小直接决定向量读写并发上限。
+    MILVUS_POOL_WORKERS: int = 8
+    # 查询后是否释放集合。默认 False：集合加载后常驻，避免每次查询重复 load。
+    MILVUS_AUTO_RELEASE: bool = False
+
+    # ---- Embedding 调用 ----
+    EMBEDDING_BATCH_SIZE: int = 16
+    EMBEDDING_MAX_CONCURRENCY: int = 4
+    EMBEDDING_MAX_RETRIES: int = 3
+    EMBEDDING_RETRY_BASE_DELAY: float = 1.0
+    EMBEDDING_CACHE_ENABLED: bool = True
+    EMBEDDING_CACHE_TTL: int = 86400
+    EMBEDDING_CACHE_MAX_SIZE: int = 5000
+
+    # ---- 查询改写 ----
+    QUERY_REWRITE_ENABLED: bool = True
+    QUERY_REWRITE_CACHE_ENABLED: bool = True
+    QUERY_REWRITE_CACHE_TTL: int = 3600
+    QUERY_REWRITE_CACHE_MAX_SIZE: int = 2000
+    QUERY_REWRITE_TIMEOUT: float = 8.0
+
     # ---- SSE streaming ----
     SSE_TIMEOUT_MS: int = 120000
 
@@ -103,6 +143,21 @@ class Settings(BaseSettings):
     INIT_ADMIN_EMAIL: str = "admin@rag.local"
 
     # ---- Derived properties ----
+    @property
+    def db_pool_size(self) -> int:
+        """单进程常驻连接数。"""
+        return self.DB_POOL_SIZE_PER_WORKER
+
+    @property
+    def db_max_overflow(self) -> int:
+        """单进程可临时超借的连接数。"""
+        return self.DB_MAX_OVERFLOW_PER_WORKER
+
+    @property
+    def db_total_connections(self) -> int:
+        """进程池打满时占用的 MySQL 连接总数，用于核对 max_connections 是否够用。"""
+        return self.APP_WORKERS * (self.DB_POOL_SIZE_PER_WORKER + self.DB_MAX_OVERFLOW_PER_WORKER)
+
     @property
     def mysql_url(self) -> str:
         """Async SQLAlchemy connection URL for MySQL."""
