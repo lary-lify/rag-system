@@ -52,7 +52,12 @@ class SemanticChunker(BaseChunkingStrategy):
         max_size = params.get("max_chunk_size", 1024)
         min_size = params.get("min_chunk_size", 100)
         threshold = params.get("similarity_threshold", 0.5)
-        pattern = params.get("sentence_split_pattern", "")
+        # R-04 修复：原默认 "" 会让 _split_sentences 把整段当 1 句，语义切分静默失效。
+        # 默认应取自 get_default_params() 中定义的断句正则。
+        pattern = params.get(
+            "sentence_split_pattern",
+            self.get_default_params()["sentence_split_pattern"],
+        )
 
         sentences = self._split_sentences(text, pattern)
         if len(sentences) <= 1:
@@ -70,12 +75,16 @@ class SemanticChunker(BaseChunkingStrategy):
 
             # Check if this sentence is a semantic break point
             should_break = False
-            if prev_vec and current_len >= min_size:
+            # R-05 修复：原代码用 `elif` 让 max_size 强制切从属于相似度判断——
+            # 一旦 current_len >= min_size，max_size 分支永不再被评估，
+            # 导致 max_chunk_size 形同虚设（相似度持续≥阈值时单 chunk 累积全部文本）。
+            # 改为先独立评估 max_size（硬上限），相似度 break 作为次级优化。
+            if current_len + sent_len > max_size:
+                should_break = True
+            elif prev_vec and current_len >= min_size:
                 sim = self._cosine_similarity(prev_vec, vec)
                 if sim < threshold:
                     should_break = True
-            elif current_len + sent_len > max_size:
-                should_break = True
 
             if should_break and current_group:
                 content = "".join(current_group).strip()

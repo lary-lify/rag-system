@@ -48,15 +48,20 @@ class HeadingLevelChunker(BaseChunkingStrategy):
             for pattern in patterns:
                 m = re.match(pattern, line.strip())
                 if m:
-                    if pattern.startswith(r'^#'):
+                    # R-02 修复：原代码用 `pattern.startswith(r'^#')` 判断 markdown，
+                    # 但 pattern 实际字符串前缀是 `^(#{1,6})`（以 `^(#` 开头），
+                    # 导致该分支永远走不到、所有 markdown 标题被错判为 level=1。
+                    # 修正为匹配真实前缀 `^(#`；HTML 分支前缀 `^(<h` 不变。
+                    if pattern.startswith(r'^(#'):
+                        # Markdown: group(1) 是 '#' 的个数，即标题层级
                         level = len(m.group(1))
                         title = m.group(2).strip()
-                    elif pattern.startswith(r'^<h'):
+                    elif pattern.startswith(r'^(<h'):
                         level = int(m.group(1)[2])
                         title = m.group(2).strip()
                     else:
-                        level = 1  # default level for Chinese/numbered headings
-                        title = (m.group(2) if m.lastindex >= 2 else m.group(0)).strip()
+                        level = 1  # Chinese/numbered headings 无层级信息，默认 1
+                        title = (m.group(2) if (m.lastindex or 0) >= 2 else m.group(0)).strip()
 
                     results.append((i, level, title))
                     break  # first match wins per line

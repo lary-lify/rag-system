@@ -94,7 +94,10 @@ class QAPairChunker(BaseChunkingStrategy):
         for idx, (q_pat, _, _) in enumerate(self.QA_PATTERNS):
             m = re.match(q_pat, text)
             if m:
-                group_val = m.group(1).strip()
+                # R-03 修复：编号模式 `r'^\s*[Qq](\d+)[.:\)]\s*(.+)'` 有 2 个捕获组，
+                # group(1)=编号、group(2)=问题全文。原代码取 group(1) 只拿到编号，
+                # 导致 Q1./A1. 模式把问题写成 "Q3:1"。统一取最后一个捕获组（即问题/答案全文）。
+                group_val = m.group(m.lastindex or 1).strip()
                 return f"Q{idx}:{group_val}" if self._get_param("include_q_prefix", True) else group_val
         return None
 
@@ -105,7 +108,8 @@ class QAPairChunker(BaseChunkingStrategy):
                 continue
             m = re.match(a_pat, text)
             if m:
-                group_val = m.group(1).strip()
+                # R-03 修复：与 _match_question 同理，取最后一个捕获组（答案全文）。
+                group_val = m.group(m.lastindex or 1).strip()
                 return f"A{idx}:{group_val}" if self._get_param("include_a_prefix", True) else group_val
         return None
 

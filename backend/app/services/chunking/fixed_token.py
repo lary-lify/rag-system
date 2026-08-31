@@ -25,8 +25,14 @@ class FixedTokenChunker(BaseChunkingStrategy):
         chunk_size = params.get("chunk_size", 512)
         overlap = params.get("overlap", 128)
 
-        if not text or chunk_size <= 0:
-            return [ChunkResult(index=0, content=text, token_count=len(text))]
+        # R-01 修复：text=None 时原代码 `len(text)` 会抛 TypeError。
+        # 单独拦截 None 返回空列表；空串与非正 chunk_size 保留原兜底（返回原文单 chunk）。
+        if text is None:
+            return []
+        if not text:
+            return [ChunkResult(index=0, content="", token_count=0)]
+        if chunk_size <= 0:
+            return [ChunkResult(index=0, content=text, token_count=len(text) // 2)]
 
         if overlap >= chunk_size:
             overlap = chunk_size // 4

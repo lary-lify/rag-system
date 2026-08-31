@@ -138,15 +138,28 @@ class RecursiveChunker(BaseChunkingStrategy):
         return final_result
 
     def _force_split(self, text: str, max_size: int) -> list[str]:
-        """Fallback: simple character-count splitting."""
-        chunks = []
+        """Fallback: simple character-count splitting with overlap.
+
+        R-06 修复：原循环在到达文本末尾（`end >= len(text)`）后仍执行
+        `start = end - (max_size // 4)`，而该值仍 < len(text)，导致无限重复
+        截取尾部而卡死。修复：到达末尾后立即 break；且无论 chunk 是否为空都
+        保证 start 向前推进（next_start 绝不大于 start）。
+        """
+        if not text:
+            return []
+        chunks: list[str] = []
         start = 0
-        idx = 0
         while start < len(text):
             end = min(start + max_size, len(text))
             chunk = text[start:end]
             if chunk.strip():
                 chunks.append(chunk)
-                idx += 1
-            start = end - (max_size // 4)  # 25% overlap
+            # 到达文本末尾：处理完尾部后必须停止，避免重复截取尾部死循环
+            if end >= len(text):
+                break
+            # 带 overlap 前进，但绝不允许回退
+            next_start = end - (max_size // 4)
+            if next_start <= start:
+                next_start = end
+            start = next_start
         return chunks if chunks else [text[:max_size]]
