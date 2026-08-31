@@ -19,13 +19,17 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # ---- Async engine & session factory ----
+# 池容量按单进程配额配置：多 worker 部署时总连接数为
+# APP_WORKERS x (pool_size + max_overflow)，需小于 MySQL max_connections。
+# pool_pre_ping 默认开启，避免拿到被 MySQL wait_timeout 回收的死连接后
+# 首个请求必然报错（原为 False，表现为长跑后零星 500）。
 engine = create_async_engine(
     settings.mysql_url + "?charset=utf8mb4",
-    echo=settings.APP_DEBUG,
-    pool_size=10,
-    max_overflow=20,
-    pool_recycle=300,
-    pool_pre_ping=False,
+    echo=settings.sql_echo,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_recycle=settings.DB_POOL_RECYCLE,
+    pool_pre_ping=settings.DB_POOL_PRE_PING,
 )
 
 

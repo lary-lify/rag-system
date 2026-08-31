@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     # gunicorn worker 数。连接池容量按 worker 数推算，多副本部署时必须与实际一致，
     # 否则会放大 MySQL 连接数（worker 数 x 单 worker 池上限）。
     APP_WORKERS: int = 1
+    # SQL 回显开关。None 表示跟随 APP_DEBUG；生产环境建议显式设为 False，
+    # 否则每条 SQL 都会落日志，高并发下日志 IO 本身就是瓶颈。
+    SQL_ECHO: bool | None = None
 
     # ---- MySQL 连接池 ----
     DB_POOL_SIZE_PER_WORKER: int = 5
@@ -143,6 +146,11 @@ class Settings(BaseSettings):
     INIT_ADMIN_EMAIL: str = "admin@rag.local"
 
     # ---- Derived properties ----
+    @property
+    def sql_echo(self) -> bool:
+        """SQLAlchemy 是否回显 SQL。未显式配置 SQL_ECHO 时跟随 APP_DEBUG。"""
+        return self.APP_DEBUG if self.SQL_ECHO is None else self.SQL_ECHO
+
     @property
     def db_pool_size(self) -> int:
         """单进程常驻连接数。"""
