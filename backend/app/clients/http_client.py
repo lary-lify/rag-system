@@ -10,26 +10,69 @@
 """
 from __future__ import annotations
 
+import threading
+
 import httpx
 from contextlib import asynccontextmanager, contextmanager
 
+from app.core.config import settings
+
 _async_client: httpx.AsyncClient | None = None
 _sync_client: httpx.Client | None = None
+# 构造客户端的过程没有 await 点，用同步锁即可避免并发首次调用时重复构造。
+_client_lock = threading.Lock()
 
 DEFAULT_TIMEOUT = 120.0
+
+
+def _build_timeout() -> httpx.Timeout:
+    """分级超时。
+
+    建连和从池里取连接应当快速失败，避免一个不可达的上游把请求全挂住；
+    读响应按模型生成耗时给足时间，具体接口仍可在调用处覆盖。
+    """
+    return httpx.Timeout(
+        connect=settings.HTTP_CONNECT_TIMEOUT,
+        read=settings.HTTP_READ_TIMEOUT,
+        write=settings.HTTP_READ_TIMEOUT,
+        pool=settings.HTTP_CONNECT_TIMEOUT,
+    )
+
+
+def _build_limits() -> httpx.Limits:
+    """按并发目标显式配置池容量。
+
+    httpx 默认是 max_connections=100 / max_keepalive=20，对 LLM 与 Embedding
+    这类长耗时外部调用来说，超出的请求会在池边静默排队，表现为延迟无端升高。
+    """
+    return httpx.Limits(
+        max_connections=settings.HTTP_MAX_CONNECTIONS,
+        max_keepalive_connections=settings.HTTP_MAX_KEEPALIVE,
+        keepalive_expiry=settings.HTTP_KEEPALIVE_EXPIRY,
+    )
 
 
 def get_http_client() -> httpx.AsyncClient:
     global _async_client
     if _async_client is None:
-        _async_client = httpx.AsyncClient(timeout=httpx.Timeout(DEFAULT_TIMEOUT))
+        with _client_lock:
+            if _async_client is None:
+                _async_client = httpx.AsyncClient(
+                    timeout=_build_timeout(),
+                    limits=_build_limits(),
+                )
     return _async_client
 
 
 def get_sync_http_client() -> httpx.Client:
     global _sync_client
     if _sync_client is None:
-        _sync_client = httpx.Client(timeout=httpx.Timeout(DEFAULT_TIMEOUT))
+        with _client_lock:
+            if _sync_client is None:
+                _sync_client = httpx.Client(
+                    timeout=_build_timeout(),
+                    limits=_build_limits(),
+                )
     return _sync_client
 
 
@@ -47,9 +90,10 @@ def sync_http_client_context():
 
 async def close_http_clients() -> None:
     global _async_client, _sync_client
-    if _async_client is not None:
-        await _async_client.aclose()
-        _async_client = None
-    if _sync_client is not None:
-        _sync_client.close()
-        _sync_client = None
+    with _client_lock:
+        client, _async_client = _async_client, None
+        sync_client, _sync_client = _sync_client, None
+    if client is not None:
+        await client.aclose()
+    if sync_client is not None:
+        sync_client.close()
