@@ -127,7 +127,9 @@ class Settings(BaseSettings):
     EMBEDDING_RETRY_BASE_DELAY: float = 1.0
     EMBEDDING_CACHE_ENABLED: bool = True
     EMBEDDING_CACHE_TTL: int = 86400
-    EMBEDDING_CACHE_MAX_SIZE: int = 5000
+    # 缓存的是 1024 维向量，单条约 32KB（Python float 列表），
+    # 1000 条约 32MB/进程。多 worker 部署时需按 worker 数折算内存。
+    EMBEDDING_CACHE_MAX_SIZE: int = 1000
 
     # ---- 查询改写 ----
     QUERY_REWRITE_ENABLED: bool = True
