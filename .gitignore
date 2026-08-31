@@ -102,3 +102,6 @@ docker-data/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# ---------- 9. 运行产物（脚本生成，非源码） ----------
+backend/outputs/
