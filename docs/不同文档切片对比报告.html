@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>不同文档切片对比报告</title>
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--ink:#1f2329;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--accent2:#0e9f6e;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:24px;margin:0 0 6px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+.doc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:26px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.doc h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{font-size:12px;font-weight:600;color:#fff;background:var(--accent);padding:2px 9px;border-radius:999px}
+.meta{color:var(--muted);font-size:13px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;background:#fafbfc}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.preview{color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:0 12px;background:#fcfcfd}
+summary{cursor:pointer;padding:8px 0;font-weight:600;font-size:13px}
+.chunk{border-top:1px dashed var(--line);padding:8px 0;font-size:12.5px}
+.chunk .ix{color:var(--accent2);font-weight:700;margin-right:6px}
+.chunk .ct{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:6px}
+</style></head><body><div class="wrap">
+<h1>不同文档切片对比报告</h1>
+<div class="sub">对多种格式样例文档，分别用 7 种切片策略进行切片并对比块数 / 长度 / 内容预览。AI 辅助策略使用<b>模拟 LLM</b>（离线，不调用真实 DeepSeek）。</div>
+
+<div class="doc"><h2>技术文档示例.md <span class="badge">Markdown</span></h2>
+<div class="meta">字符数 828 · 段落数约 7</div>
+<table><thead><tr><th>策略</th><th class="num">块数</th><th class="num">平均长度</th><th class="num">最大块</th><th class="num">最小块</th><th>首块预览</th></tr></thead><tbody>
+<tr><td><b>固定Token</b></td><td class="num">5</td><td class="num">205</td><td class="num">300</td><td class="num">49</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中"># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中</td></tr>
+<tr><td><b>语义切块</b></td><td class="num">7</td><td class="num">116</td><td class="num">158</td><td class="num">81</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1.系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小"># 企业知识库系统技术白皮书
+
+## 1.系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小</td></tr>
+<tr><td><b>段落切块</b></td><td class="num">2</td><td class="num">412</td><td class="num">574</td><td class="num">251</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中"># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中</td></tr>
+<tr><td><b>标题层级</b></td><td class="num">6</td><td class="num">130</td><td class="num">157</td><td class="num">115</td><td class="preview" title="1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检">1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检</td></tr>
+<tr><td><b>问答对</b></td><td class="num">1</td><td class="num">827</td><td class="num">827</td><td class="num">827</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中"># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中</td></tr>
+<tr><td><b>递归切片</b></td><td class="num">3</td><td class="num">282</td><td class="num">311</td><td class="num">260</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中"># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中</td></tr>
+<tr><td><b>AI辅助(模拟)</b></td><td class="num">2</td><td class="num">413</td><td class="num">719</td><td class="num">107</td><td class="preview" title="# 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中"># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中</td></tr>
+</tbody></table>
+<details><summary>固定Token — 5 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[300字 · start_char=0 · end_char=300]</span><br># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。
+
+## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[300字 · start_char=250 · end_char=550]</span><br>基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦，便于独立扩展与替换。
+
+### 2.1 文档接入层
+文档接入层支持 PDF、Word、Markdown、TXT 与常见办公格式。上传后系统自动识别类型并抽取纯文本，随后进入切片流水线。大文件采用分块上传与异步处理，避免阻塞主线程，处理进度通过事件流实时回传前端。
+
+### 2.2 向量检索层
+向量检索层使用 Milvus 存储高维向量，配合阿里通义 text-embedding-v3 生成句向量。检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[300字 · start_char=500 · end_char=800]</span><br>。检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库与部门维度隔离，保证多租户场景下的数据边界清晰。
+
+## 3. 切片策略
+系统内置七种切片策略，包括固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，管理员可在上传时手动选择，也可由系统按文档特征推荐。切片质量直接影响后续检索召回率，是整套链路的关键环节。
+
+## 4. 权限模型
+系统提供三级权限：超级管理员、部门管理员与普通用户。知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[77字 · start_char=750 · end_char=828]</span><br>持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[49字 · start_char=778 · end_char=828]</span><br>识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+<details><summary>语义切块 — 7 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[123字 · sentence_count=3]</span><br># 企业知识库系统技术白皮书
+
+## 1.系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[158字 · sentence_count=4]</span><br>整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。## 2.核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[106字 · sentence_count=4]</span><br>各层之间通过明确定义的接口解耦，便于独立扩展与替换。### 2.1 文档接入层
+文档接入层支持 PDF、Word、Markdown、TXT 与常见办公格式。上传后系统自动识别类型并抽取纯文本，随后进入切片流水线。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[106字 · sentence_count=3]</span><br>大文件采用分块上传与异步处理，避免阻塞主线程，处理进度通过事件流实时回传前端。### 2.2 向量检索层
+向量检索层使用 Milvus 存储高维向量，配合阿里通义 text-embedding-v3 生成句向量。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[136字 · sentence_count=4]</span><br>检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库与部门维度隔离，保证多租户场景下的数据边界清晰。## 3.切片策略
+系统内置七种切片策略，包括固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。</div>
+<div class="chunk"><span class="ix">#5</span><span class="ct">[103字 · sentence_count=4]</span><br>不同策略适用于不同文档结构，管理员可在上传时手动选择，也可由系统按文档特征推荐。切片质量直接影响后续检索召回率，是整套链路的关键环节。## 4.权限模型
+系统提供三级权限：超级管理员、部门管理员与普通用户。</div>
+<div class="chunk"><span class="ix">#6</span><span class="ct">[81字 · sentence_count=2]</span><br>知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+<details><summary>段落切块 — 2 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[574字 · paragraph_count=5]</span><br># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。
+
+## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[251字 · paragraph_count=2]</span><br>## 3. 切片策略
+系统内置七种切片策略，包括固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，管理员可在上传时手动选择，也可由系统按文档特征推荐。切片质量直接影响后续检索召回率，是整套链路的关键环节。
+
+## 4. 权限模型
+系统提供三级权限：超级管理员、部门管理员与普通用户。知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+<details><summary>标题层级 — 6 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[157字 · heading_level=2 · heading_title=1. 系统概述 · start_line=3 · end_line=5]</span><br>1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[130字 · heading_level=2 · heading_title=2. 核心架构 · start_line=6 · end_line=8]</span><br>2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦，便于独立扩展与替换。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[115字 · heading_level=3 · heading_title=2.1 文档接入层 · start_line=9 · end_line=11]</span><br>2.1 文档接入层
+文档接入层支持 PDF、Word、Markdown、TXT 与常见办公格式。上传后系统自动识别类型并抽取纯文本，随后进入切片流水线。大文件采用分块上传与异步处理，避免阻塞主线程，处理进度通过事件流实时回传前端。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[136字 · heading_level=3 · heading_title=2.2 向量检索层 · start_line=12 · end_line=14]</span><br>2.2 向量检索层
+向量检索层使用 Milvus 存储高维向量，配合阿里通义 text-embedding-v3 生成句向量。检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库与部门维度隔离，保证多租户场景下的数据边界清晰。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[128字 · heading_level=2 · heading_title=3. 切片策略 · start_line=15 · end_line=17]</span><br>3. 切片策略
+系统内置七种切片策略，包括固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，管理员可在上传时手动选择，也可由系统按文档特征推荐。切片质量直接影响后续检索召回率，是整套链路的关键环节。</div>
+<div class="chunk"><span class="ix">#5</span><span class="ct">[115字 · heading_level=2 · heading_title=4. 权限模型 · start_line=18 · end_line=20]</span><br>4. 权限模型
+系统提供三级权限：超级管理员、部门管理员与普通用户。知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+<details><summary>问答对 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[827字 · paragraph_count=7]</span><br># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。
+
+## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦…</div>
+</details>
+<details><summary>递归切片 — 3 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[311字 · split_level=0 · char_length=311]</span><br># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。
+
+## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[275字 · split_level=0 · char_length=275]</span><br>## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦，便于独立扩展与替换。
+
+### 2.2 向量检索层
+向量检索层使用 Milvus 存储高维向量，配合阿里通义 text-embedding-v3 生成句向量。检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库与部门维度隔离，保证多租户场景下的数据边界清晰。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[260字 · split_level=0 · char_length=261]</span><br>### 2.2 向量检索层
+向量检索层使用 Milvus 存储高维向量，配合阿里通义 text-embedding-v3 生成句向量。检索时根据用户问题向量召回 Top-K 相似片段，并拼接上下文送入大模型生成答案。该层支持按知识库与部门维度隔离，保证多租户场景下的数据边界清晰。
+
+## 4. 权限模型
+系统提供三级权限：超级管理员、部门管理员与普通用户。知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+<details><summary>AI辅助(模拟) — 2 块 · 模拟LLM 用量: 414 in / 12 out · ¥0.00012</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[719字 · ai_used=True · char_length=719 · boundary_count=1]</span><br># 企业知识库系统技术白皮书
+
+## 1. 系统概述
+企业知识库系统（Enterprise RAG KB）面向制造业与中小企业，提供文档归集、智能切片、向量检索与对话式问答的一体化能力。系统支持多人协同维护知识库，并通过细粒度权限控制保障数据安全。整体采用前后端分离架构，后端基于 FastAPI，前端基于 Vue3 与 Ant Design Vue。
+
+## 2. 核心架构
+企业知识库系统自底向上分为接入层、处理层、检索层与应用层。接入层负责文档上传与格式解析；处理层完成文本切片与向量化；检索层基于 Milvus 提供近似最近邻搜索；应用层对外暴露对话与管理系统。各层之间通过明确定义的接口解耦…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[107字 · ai_used=True · char_length=107 · boundary_count=1]</span><br>系统提供三级权限：超级管理员、部门管理员与普通用户。知识库支持私有与共享两种模式，并通过独立的权限表记录每个成员对知识库的读取、上传与管理权限，确保最小授权原则落地。所有敏感操作均写入审计日志，支持事后追溯与导出。</div>
+</details>
+</div>
+<div class="doc"><h2>知识库问答.csv <span class="badge">CSV(问答)</span></h2>
+<div class="meta">字符数 350 · 段落数约 6</div>
+<table><thead><tr><th>策略</th><th class="num">块数</th><th class="num">平均长度</th><th class="num">最大块</th><th class="num">最小块</th><th>首块预览</th></tr></thead><tbody>
+<tr><td><b>固定Token</b></td><td class="num">3</td><td class="num">150</td><td class="num">288</td><td class="num">50</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+<tr><td><b>语义切块</b></td><td class="num">3</td><td class="num">114</td><td class="num">119</td><td class="num">106</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+<tr><td><b>段落切块</b></td><td class="num">1</td><td class="num">350</td><td class="num">350</td><td class="num">350</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+<tr><td><b>标题层级</b></td><td class="num">1</td><td class="num">350</td><td class="num">350</td><td class="num">350</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+<tr><td><b>问答对</b></td><td class="num">6</td><td class="num">60</td><td class="num">80</td><td class="num">23</td><td class="preview" title="Q0:﻿question
+
+A0:answer">Q0:﻿question
+
+A0:answer</td></tr>
+<tr><td><b>递归切片</b></td><td class="num">1</td><td class="num">350</td><td class="num">350</td><td class="num">350</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+<tr><td><b>AI辅助(模拟)</b></td><td class="num">1</td><td class="num">350</td><td class="num">350</td><td class="num">350</td><td class="preview" title="问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见">问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见</td></tr>
+</tbody></table>
+<details><summary>固定Token — 3 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[288字 · start_char=0 · end_char=289]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。
+
+问：切片策略可以在上传后修改吗
+答：可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。
+
+问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。
+
+问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[111字 · start_char=239 · end_char=350]</span><br>的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。
+
+问：检索结果不准确怎么办
+答：建议检查切片策略是否匹配文档结构，并尝试提高向量模型版本或调整 Top-K 与相似度阈值。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[50字 · start_char=300 · end_char=350]</span><br>么办
+答：建议检查切片策略是否匹配文档结构，并尝试提高向量模型版本或调整 Top-K 与相似度阈值。</div>
+</details>
+<details><summary>语义切块 — 3 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[106字 · sentence_count=3]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。问：切片策略可以在上传后修改吗
+答：可以。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[119字 · sentence_count=2]</span><br>在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[117字 · sentence_count=2]</span><br>问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。问：检索结果不准确怎么办
+答：建议检查切片策略是否匹配文档结构，并尝试提高向量模型版本或调整 Top-K 与相似度阈值。</div>
+</details>
+<details><summary>段落切块 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[350字 · paragraph_count=6]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。
+
+问：切片策略可以在上传后修改吗
+答：可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。
+
+问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。
+
+问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。
+
+问：检索结果不准确怎…</div>
+</details>
+<details><summary>标题层级 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[350字 · paragraph_count=6]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。
+
+问：切片策略可以在上传后修改吗
+答：可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。
+
+问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。
+
+问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。
+
+问：检索结果不准确怎…</div>
+</details>
+<details><summary>问答对 — 6 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[23字 · has_question=True · has_answer=True · question_preview=Q0:﻿question · answer_length=9]</span><br>Q0:﻿question
+
+A0:answer</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[66字 · has_question=True · has_answer=True · question_preview=Q0:如何创建一个新的知识库 · answer_length=50]</span><br>Q0:如何创建一个新的知识库
+
+A0:在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[66字 · has_question=True · has_answer=True · question_preview=Q0:切片策略可以在上传后修改吗 · answer_length=48]</span><br>Q0:切片策略可以在上传后修改吗
+
+A0:可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[80字 · has_question=True · has_answer=True · question_preview=Q0:向量检索的 Top-K 是什么意思 · answer_length=58]</span><br>Q0:向量检索的 Top-K 是什么意思
+
+A0:Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[60字 · has_question=True · has_answer=True · question_preview=Q0:支持哪些语言的文档 · answer_length=46]</span><br>Q0:支持哪些语言的文档
+
+A0:系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。</div>
+<div class="chunk"><span class="ix">#5</span><span class="ct">[63字 · has_question=True · has_answer=True · question_preview=Q0:检索结果不准确怎么办 · answer_length=48]</span><br>Q0:检索结果不准确怎么办
+
+A0:建议检查切片策略是否匹配文档结构，并尝试提高向量模型版本或调整 Top-K 与相似度阈值。</div>
+</details>
+<details><summary>递归切片 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[350字]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。
+
+问：切片策略可以在上传后修改吗
+答：可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。
+
+问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。
+
+问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。
+
+问：检索结果不准确怎…</div>
+</details>
+<details><summary>AI辅助(模拟) — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[350字 · ai_used=False · char_length=350]</span><br>问：﻿question
+答：answer
+
+问：如何创建一个新的知识库
+答：在管理后台点击&quot;新建知识库&quot;，填写名称与可见范围后保存即可。创建后可为成员分配读取或管理权限。
+
+问：切片策略可以在上传后修改吗
+答：可以。在文档详情页的&quot;切片设置&quot;中重新选择策略并触发重新切片，系统会保留历史版本便于对比。
+
+问：向量检索的 Top-K 是什么意思
+答：Top-K 表示每次检索返回最相关的 K 个片段，系统默认取 5，可在知识库设置中调整为 3 到 10 之间。
+
+问：支持哪些语言的文档
+答：系统对中文与英文文档均做了优化，其他语种也可入库，但切片与检索效果可能略低于中英双语。
+
+问：检索结果不准确怎…</div>
+</details>
+</div>
+<div class="doc"><h2>网页示例.html <span class="badge">HTML</span></h2>
+<div class="meta">字符数 255 · 段落数约 9</div>
+<table><thead><tr><th>策略</th><th class="num">块数</th><th class="num">平均长度</th><th class="num">最大块</th><th class="num">最小块</th><th>首块预览</th></tr></thead><tbody>
+<tr><td><b>固定Token</b></td><td class="num">2</td><td class="num">152</td><td class="num">255</td><td class="num">50</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>语义切块</b></td><td class="num">3</td><td class="num">83</td><td class="num">126</td><td class="num">23</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>段落切块</b></td><td class="num">1</td><td class="num">255</td><td class="num">255</td><td class="num">255</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>标题层级</b></td><td class="num">1</td><td class="num">255</td><td class="num">255</td><td class="num">255</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>问答对</b></td><td class="num">1</td><td class="num">255</td><td class="num">255</td><td class="num">255</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>递归切片</b></td><td class="num">1</td><td class="num">255</td><td class="num">255</td><td class="num">255</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+<tr><td><b>AI辅助(模拟)</b></td><td class="num">1</td><td class="num">255</td><td class="num">255</td><td class="num">255</td><td class="preview" title="产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核">产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核</td></tr>
+</tbody></table>
+<details><summary>固定Token — 2 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字 · start_char=0 · end_char=255]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[50字 · start_char=205 · end_char=255]</span><br>题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>语义切块 — 3 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[126字 · sentence_count=4]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[100字 · sentence_count=3]</span><br>数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[23字 · sentence_count=1]</span><br>你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>段落切块 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字 · paragraph_count=9]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>标题层级 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字 · paragraph_count=9]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>问答对 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字 · paragraph_count=9]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>递归切片 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+<details><summary>AI辅助(模拟) — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[255字 · ai_used=False · char_length=255]</span><br>产品帮助中心
+
+产品帮助中心
+
+欢迎使用企业知识库系统。本帮助中心整理了账号、数据与检索相关的常见问题，帮助你快速上手核心功能。
+
+账号管理
+
+你可以在个人中心修改登录密码、绑定邮箱与手机号。若忘记密码，可通过管理员发起重置流程，重置链接有效期为三十分钟。
+
+数据导入
+
+系统支持批量上传文档，单次最多导入五百个文件。上传完成后可在任务列表中查看切片与向量化的处理进度。
+
+检索与问答
+
+在对话页输入自然语言问题，系统会自动检索最相关的知识片段并生成带出处的答案。你也可以通过筛选器限定检索的部门与知识库范围。</div>
+</details>
+</div>
+<div class="doc"><h2>长篇文章示例.txt <span class="badge">纯文本</span></h2>
+<div class="meta">字符数 1367 · 段落数约 10</div>
+<table><thead><tr><th>策略</th><th class="num">块数</th><th class="num">平均长度</th><th class="num">最大块</th><th class="num">最小块</th><th>首块预览</th></tr></thead><tbody>
+<tr><td><b>固定Token</b></td><td class="num">7</td><td class="num">238</td><td class="num">300</td><td class="num">49</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>语义切块</b></td><td class="num">11</td><td class="num">123</td><td class="num">140</td><td class="num">102</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>段落切块</b></td><td class="num">3</td><td class="num">454</td><td class="num">566</td><td class="num">258</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>标题层级</b></td><td class="num">1</td><td class="num">1366</td><td class="num">1366</td><td class="num">1366</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>问答对</b></td><td class="num">1</td><td class="num">1366</td><td class="num">1366</td><td class="num">1366</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>递归切片</b></td><td class="num">5</td><td class="num">275</td><td class="num">284</td><td class="num">266</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+<tr><td><b>AI辅助(模拟)</b></td><td class="num">2</td><td class="num">682</td><td class="num">698</td><td class="num">666</td><td class="preview" title="检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库">检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库</td></tr>
+</tbody></table>
+<details><summary>固定Token — 7 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[282字 · start_char=0 · end_char=283]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[300字 · start_char=233 · end_char=533]</span><br>后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+切片（Chunking）是 RAG 链路中极其关键却常被忽视的一步。一段长文档如果切得太碎，单个片段就失去了足够的上下文，检索到了也容易答非所问；如果切得太大，又会混入太多无关内容，稀释了真正相关的信号。因此，针对不同结构的文档选择合适的切片策略，是工程上必须认真权衡的问题。
+
+固定 Token 切片是最直接的做法，按字符或 token 数量均匀切分，实现简单、速度快，适合大多数通用文档。但它的弱点也很明显：它完全不理解语义，很可能把一句话拦腰截断，导致 fragment 不完整。对于结构规整</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[300字 · start_char=483 · end_char=783]</span><br>弱点也很明显：它完全不理解语义，很可能把一句话拦腰截断，导致 fragment 不完整。对于结构规整、段落清晰的文档，段落切块或标题层级切块往往能保留更好的语义边界。
+
+语义切块则尝试用相似度来判断“这里是不是该断了”。它把文本拆成句子，再逐个比较相邻句子的语义距离，当距离突然变大时认为出现了话题切换，就在那里切一刀。这种方式对主题跳跃明显的长文效果不错，但对中文这种缺乏天然句边界的语言，相似度计算的准确度直接决定了切块质量。
+
+递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[225字 · start_char=733 · end_char=959]</span><br>块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。
+
+AI 辅助切片是近年来的新方向。它把文本送给大模型，让模型直接标出“哪些位置是自然的语义边界”。模型的判断力显然强于简单规则，尤其擅长识别话题转换与章节过渡。当然，代价是每次切片都要消耗一次模型调用，成本和时延都更高，因此更适合对质量极度敏感、且文档更新不频繁的场景。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[300字 · start_char=909 · end_char=1209]</span><br>每次切片都要消耗一次模型调用，成本和时延都更高，因此更适合对质量极度敏感、且文档更新不频繁的场景。
+
+在实际应用中，切片策略往往不是单一使用的。一个成熟的知识库会为不同文档类型建立策略映射：技术白皮书走标题层级，FAQ 走问答对，无结构长文走语义或递归，通用材料走固定 Token，而对质量要求极高的关键文档再启用 AI 辅助。把策略选择做成可配置、可观测的能力，才是企业知识库真正成熟的标志。
+
+除了策略本身，切片长度的选择同样重要。太短的块检索精度高但上下文缺失，太长的块信息完整但噪声大。业界通常把目标块控制在三百到一千字符之间，并配合适当的重叠（overlap）来保留跨块上下文。我们的系统在</div>
+<div class="chunk"><span class="ix">#5</span><span class="ct">[207字 · start_char=1159 · end_char=1367]</span><br>常把目标块控制在三百到一千字符之间，并配合适当的重叠（overlap）来保留跨块上下文。我们的系统在上传时会根据文档特征给出推荐区间，管理员也可以手动微调。
+
+最后要强调的是，切片质量必须用检索效果来检验，而不是仅凭块数或长度评判。建议在上线前用一批真实问答做召回评测，观察不同策略下的命中率与答案准确率，再据此固化配置。只有把切片、向量化与检索放在同一个闭环里持续优化，RAG 系统才能在企业场景里真正站稳脚跟。</div>
+<div class="chunk"><span class="ix">#6</span><span class="ct">[49字 · start_char=1317 · end_char=1367]</span><br>配置。只有把切片、向量化与检索放在同一个闭环里持续优化，RAG 系统才能在企业场景里真正站稳脚跟。</div>
+</details>
+<details><summary>语义切块 — 11 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[140字 · sentence_count=3]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[140字 · sentence_count=3]</span><br>在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[102字 · sentence_count=2]</span><br>切片（Chunking）是 RAG 链路中极其关键却常被忽视的一步。一段长文档如果切得太碎，单个片段就失去了足够的上下文，检索到了也容易答非所问；如果切得太大，又会混入太多无关内容，稀释了真正相关的信号。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[139字 · sentence_count=3]</span><br>因此，针对不同结构的文档选择合适的切片策略，是工程上必须认真权衡的问题。固定 Token 切片是最直接的做法，按字符或 token 数量均匀切分，实现简单、速度快，适合大多数通用文档。但它的弱点也很明显：它完全不理解语义，很可能把一句话拦腰截断，导致 fragment 不完整。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[114字 · sentence_count=3]</span><br>对于结构规整、段落清晰的文档，段落切块或标题层级切块往往能保留更好的语义边界。语义切块则尝试用相似度来判断“这里是不是该断了”。它把文本拆成句子，再逐个比较相邻句子的语义距离，当距离突然变大时认为出现了话题切换，就在那里切一刀。</div>
+<div class="chunk"><span class="ix">#5</span><span class="ct">[123字 · sentence_count=2]</span><br>这种方式对主题跳跃明显的长文效果不错，但对中文这种缺乏天然句边界的语言，相似度计算的准确度直接决定了切块质量。递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。</div>
+<div class="chunk"><span class="ix">#6</span><span class="ct">[102字 · sentence_count=4]</span><br>它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。AI 辅助切片是近年来的新方向。它把文本送给大模型，让模型直接标出“哪些位置是自然的语义边界”。</div>
+<div class="chunk"><span class="ix">#7</span><span class="ct">[107字 · sentence_count=3]</span><br>模型的判断力显然强于简单规则，尤其擅长识别话题转换与章节过渡。当然，代价是每次切片都要消耗一次模型调用，成本和时延都更高，因此更适合对质量极度敏感、且文档更新不频繁的场景。在实际应用中，切片策略往往不是单一使用的。</div>
+<div class="chunk"><span class="ix">#8</span><span class="ct">[125字 · sentence_count=2]</span><br>一个成熟的知识库会为不同文档类型建立策略映射：技术白皮书走标题层级，FAQ 走问答对，无结构长文走语义或递归，通用材料走固定 Token，而对质量要求极高的关键文档再启用 AI 辅助。把策略选择做成可配置、可观测的能力，才是企业知识库真正成熟的标志。</div>
+<div class="chunk"><span class="ix">#9</span><span class="ct">[129字 · sentence_count=4]</span><br>除了策略本身，切片长度的选择同样重要。太短的块检索精度高但上下文缺失，太长的块信息完整但噪声大。业界通常把目标块控制在三百到一千字符之间，并配合适当的重叠（overlap）来保留跨块上下文。我们的系统在上传时会根据文档特征给出推荐区间，管理员也可以手动微调。</div>
+<div class="chunk"><span class="ix">#10</span><span class="ct">[127字 · sentence_count=3]</span><br>最后要强调的是，切片质量必须用检索效果来检验，而不是仅凭块数或长度评判。建议在上线前用一批真实问答做召回评测，观察不同策略下的命中率与答案准确率，再据此固化配置。只有把切片、向量化与检索放在同一个闭环里持续优化，RAG 系统才能在企业场景里真正站稳脚跟。</div>
+</details>
+<details><summary>段落切块 — 3 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[566字 · paragraph_count=4]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+切片（Chunking）是 RA…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[538字 · paragraph_count=4]</span><br>语义切块则尝试用相似度来判断“这里是不是该断了”。它把文本拆成句子，再逐个比较相邻句子的语义距离，当距离突然变大时认为出现了话题切换，就在那里切一刀。这种方式对主题跳跃明显的长文效果不错，但对中文这种缺乏天然句边界的语言，相似度计算的准确度直接决定了切块质量。
+
+递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。
+
+AI 辅助切片是近年来的新方向。它把文本送给大模型，让模型直接标出“哪些位置是自然的语义…</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[258字 · paragraph_count=2]</span><br>除了策略本身，切片长度的选择同样重要。太短的块检索精度高但上下文缺失，太长的块信息完整但噪声大。业界通常把目标块控制在三百到一千字符之间，并配合适当的重叠（overlap）来保留跨块上下文。我们的系统在上传时会根据文档特征给出推荐区间，管理员也可以手动微调。
+
+最后要强调的是，切片质量必须用检索效果来检验，而不是仅凭块数或长度评判。建议在上线前用一批真实问答做召回评测，观察不同策略下的命中率与答案准确率，再据此固化配置。只有把切片、向量化与检索放在同一个闭环里持续优化，RAG 系统才能在企业场景里真正站稳脚跟。</div>
+</details>
+<details><summary>标题层级 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[1366字 · paragraph_count=10]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+切片（Chunking）是 RA…</div>
+</details>
+<details><summary>问答对 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[1366字 · paragraph_count=10]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+切片（Chunking）是 RA…</div>
+</details>
+<details><summary>递归切片 — 5 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[282字 · split_level=0 · char_length=282]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[284字 · split_level=0 · char_length=284]</span><br>在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+固定 Token 切片是最直接的做法，按字符或 token 数量均匀切分，实现简单、速度快，适合大多数通用文档。但它的弱点也很明显：它完全不理解语义，很可能把一句话拦腰截断，导致 fragment 不完整。对于结构规整、段落清晰的文档，段落切块或标题层级切块往往能保留更好的语义边界。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[266字 · split_level=0 · char_length=266]</span><br>固定 Token 切片是最直接的做法，按字符或 token 数量均匀切分，实现简单、速度快，适合大多数通用文档。但它的弱点也很明显：它完全不理解语义，很可能把一句话拦腰截断，导致 fragment 不完整。对于结构规整、段落清晰的文档，段落切块或标题层级切块往往能保留更好的语义边界。
+
+递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[270字 · split_level=0 · char_length=270]</span><br>递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。
+
+在实际应用中，切片策略往往不是单一使用的。一个成熟的知识库会为不同文档类型建立策略映射：技术白皮书走标题层级，FAQ 走问答对，无结构长文走语义或递归，通用材料走固定 Token，而对质量要求极高的关键文档再启用 AI 辅助。把策略选择做成可配置、可观测的能力，才是企业知识库真正成熟的标志。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[275字 · split_level=0 · char_length=276]</span><br>在实际应用中，切片策略往往不是单一使用的。一个成熟的知识库会为不同文档类型建立策略映射：技术白皮书走标题层级，FAQ 走问答对，无结构长文走语义或递归，通用材料走固定 Token，而对质量要求极高的关键文档再启用 AI 辅助。把策略选择做成可配置、可观测的能力，才是企业知识库真正成熟的标志。
+
+最后要强调的是，切片质量必须用检索效果来检验，而不是仅凭块数或长度评判。建议在上线前用一批真实问答做召回评测，观察不同策略下的命中率与答案准确率，再据此固化配置。只有把切片、向量化与检索放在同一个闭环里持续优化，RAG 系统才能在企业场景里真正站稳脚跟。</div>
+</details>
+<details><summary>AI辅助(模拟) — 2 块 · 模拟LLM 用量: 683 in / 12 out · ¥0.00012</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[698字 · ai_used=True · char_length=698 · boundary_count=1]</span><br>检索增强生成（RAG）是当下企业落地大模型最主流的路径之一。它的核心思想并不复杂：先让模型在回答之前，去一个可信的知识库里查找相关资料，再把资料和原始问题一起交给大模型，生成有依据、可溯源的回答。相比纯靠参数记忆的生成方式，RAG 能显著降低幻觉，也让答案能够跟随知识库实时更新。
+
+在真实的企业场景里，RAG 的价值首先体现在“知识可控”上。很多公司的制度、产品手册、工单记录都散落在不同系统里，员工想查一条准确信息往往要翻好几份文档。把这些信息统一沉淀进知识库之后，任何人用自然语言提问，系统都能在几秒内给出带出处的答复，这背后依赖的正是稳定的切片与检索能力。
+
+切片（Chunking）是 RA…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[666字 · ai_used=True · char_length=666 · boundary_count=1]</span><br>递归切片采取的是“由粗到细”的思路：先用段落这种大分隔符切，发现某块还是太大，就退而求其次用换行、句号、逗号依次再切，直到满足长度限制。它兼顾了结构保持与长度约束，是兼顾效果和稳定性的常用选择。我们的系统也把它作为无标题长文的默认推荐策略之一。
+
+AI 辅助切片是近年来的新方向。它把文本送给大模型，让模型直接标出“哪些位置是自然的语义边界”。模型的判断力显然强于简单规则，尤其擅长识别话题转换与章节过渡。当然，代价是每次切片都要消耗一次模型调用，成本和时延都更高，因此更适合对质量极度敏感、且文档更新不频繁的场景。
+
+在实际应用中，切片策略往往不是单一使用的。一个成熟的知识库会为不同文档类型建立策…</div>
+</details>
+</div>
+<div class="doc"><h2>问答对示例.txt <span class="badge">纯文本</span></h2>
+<div class="meta">字符数 545 · 段落数约 5</div>
+<table><thead><tr><th>策略</th><th class="num">块数</th><th class="num">平均长度</th><th class="num">最大块</th><th class="num">最小块</th><th>首块预览</th></tr></thead><tbody>
+<tr><td><b>固定Token</b></td><td class="num">4</td><td class="num">173</td><td class="num">273</td><td class="num">49</td><td class="preview" title="Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成">Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成</td></tr>
+<tr><td><b>语义切块</b></td><td class="num">4</td><td class="num">130</td><td class="num">180</td><td class="num">108</td><td class="preview" title="Q1.什么是 RAG？A1.RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩">Q1.什么是 RAG？A1.RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩</td></tr>
+<tr><td><b>段落切块</b></td><td class="num">1</td><td class="num">544</td><td class="num">544</td><td class="num">544</td><td class="preview" title="Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成">Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成</td></tr>
+<tr><td><b>标题层级</b></td><td class="num">1</td><td class="num">544</td><td class="num">544</td><td class="num">544</td><td class="preview" title="Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成">Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成</td></tr>
+<tr><td><b>问答对</b></td><td class="num">5</td><td class="num">106</td><td class="num">126</td><td class="num">93</td><td class="preview" title="Q3:什么是 RAG？
+
+A3:RAG 是 Retrieval-Augmented Generation（检索增强生成）">Q3:什么是 RAG？
+
+A3:RAG 是 Retrieval-Augmented Generation（检索增强生成）</td></tr>
+<tr><td><b>递归切片</b></td><td class="num">2</td><td class="num">254</td><td class="num">314</td><td class="num">195</td><td class="preview" title="Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成">Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成</td></tr>
+<tr><td><b>AI辅助(模拟)</b></td><td class="num">1</td><td class="num">544</td><td class="num">544</td><td class="num">544</td><td class="preview" title="Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成">Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成</td></tr>
+</tbody></table>
+<details><summary>固定Token — 4 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[239字 · start_char=0 · end_char=239]</span><br>Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。
+
+Q2. 知识库系统支持哪些文档格式？
+A2. 系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3.</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[273字 · start_char=189 · end_char=462]</span><br>并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传时可手动选择或交由系统推荐。
+
+Q4. 如何保证检索的准确率？
+A4. 准确率由切片质量、向量模型与召回策略共同决定。我们采用阿里通义 text-embedding-v3 生成句向量，并在 Milvus 中做近似最近邻检索，配合按知识库隔离的 Top-K 召回，保证结果相关且边界清晰。
+
+Q5. 权限是如何控制的？
+A5.</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[132字 · start_char=412 · end_char=545]</span><br>配合按知识库隔离的 Top-K 召回，保证结果相关且边界清晰。
+
+Q5. 权限是如何控制的？
+A5. 系统提供超级管理员、部门管理员与普通用户三级权限，知识库支持私有与共享模式，并通过独立权限表记录每个成员的读取、上传与管理权限，所有敏感操作均写入审计日志可追溯。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[49字 · start_char=495 · end_char=545]</span><br>与共享模式，并通过独立权限表记录每个成员的读取、上传与管理权限，所有敏感操作均写入审计日志可追溯。</div>
+</details>
+<details><summary>语义切块 — 4 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[116字 · sentence_count=5]</span><br>Q1.什么是 RAG？A1.RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[108字 · sentence_count=7]</span><br>Q2.知识库系统支持哪些文档格式？A2.系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。Q3.一共内置几种切片策略？</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[117字 · sentence_count=7]</span><br>A3.共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传时可手动选择或交由系统推荐。Q4.如何保证检索的准确率？A4.准确率由切片质量、向量模型与召回策略共同决定。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[180字 · sentence_count=5]</span><br>我们采用阿里通义 text-embedding-v3 生成句向量，并在 Milvus 中做近似最近邻检索，配合按知识库隔离的 Top-K 召回，保证结果相关且边界清晰。Q5.权限是如何控制的？A5.系统提供超级管理员、部门管理员与普通用户三级权限，知识库支持私有与共享模式，并通过独立权限表记录每个成员的读取、上传与管理权限，所有敏感操作均写入审计日志可追溯。</div>
+</details>
+<details><summary>段落切块 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[544字 · paragraph_count=5]</span><br>Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。
+
+Q2. 知识库系统支持哪些文档格式？
+A2. 系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传…</div>
+</details>
+<details><summary>标题层级 — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[544字 · paragraph_count=5]</span><br>Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。
+
+Q2. 知识库系统支持哪些文档格式？
+A2. 系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传…</div>
+</details>
+<details><summary>问答对 — 5 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[118字 · has_question=True · has_answer=True · question_preview=Q3:什么是 RAG？ · answer_length=105]</span><br>Q3:什么是 RAG？
+
+A3:RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[96字 · has_question=True · has_answer=True · question_preview=Q3:知识库系统支持哪些文档格式？ · answer_length=77]</span><br>Q3:知识库系统支持哪些文档格式？
+
+A3:系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。</div>
+<div class="chunk"><span class="ix">#2</span><span class="ct">[93字 · has_question=True · has_answer=True · question_preview=Q3:一共内置几种切片策略？ · answer_length=77]</span><br>Q3:一共内置几种切片策略？
+
+A3:共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传时可手动选择或交由系统推荐。</div>
+<div class="chunk"><span class="ix">#3</span><span class="ct">[126字 · has_question=True · has_answer=True · question_preview=Q3:如何保证检索的准确率？ · answer_length=110]</span><br>Q3:如何保证检索的准确率？
+
+A3:准确率由切片质量、向量模型与召回策略共同决定。我们采用阿里通义 text-embedding-v3 生成句向量，并在 Milvus 中做近似最近邻检索，配合按知识库隔离的 Top-K 召回，保证结果相关且边界清晰。</div>
+<div class="chunk"><span class="ix">#4</span><span class="ct">[98字 · has_question=True · has_answer=True · question_preview=Q3:权限是如何控制的？ · answer_length=84]</span><br>Q3:权限是如何控制的？
+
+A3:系统提供超级管理员、部门管理员与普通用户三级权限，知识库支持私有与共享模式，并通过独立权限表记录每个成员的读取、上传与管理权限，所有敏感操作均写入审计日志可追溯。</div>
+</details>
+<details><summary>递归切片 — 2 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[314字 · split_level=0 · char_length=314]</span><br>Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。
+
+Q2. 知识库系统支持哪些文档格式？
+A2. 系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传…</div>
+<div class="chunk"><span class="ix">#1</span><span class="ct">[195字 · split_level=0 · char_length=196]</span><br>Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传时可手动选择或交由系统推荐。
+
+Q5. 权限是如何控制的？
+A5. 系统提供超级管理员、部门管理员与普通用户三级权限，知识库支持私有与共享模式，并通过独立权限表记录每个成员的读取、上传与管理权限，所有敏感操作均写入审计日志可追溯。</div>
+</details>
+<details><summary>AI辅助(模拟) — 1 块</summary>
+<div class="chunk"><span class="ix">#0</span><span class="ct">[544字 · ai_used=False · char_length=545]</span><br>Q1. 什么是 RAG？
+A1. RAG 是 Retrieval-Augmented Generation（检索增强生成）的缩写。它先根据用户问题从知识库检索相关片段，再把片段与问题一起交给大模型生成答案，从而显著降低幻觉、支持答案溯源。
+
+Q2. 知识库系统支持哪些文档格式？
+A2. 系统支持 PDF、Word、Markdown、TXT 以及常见办公文档。上传后自动识别类型并抽取纯文本，随后进入切片与向量化流水线，无需人工预处理。
+
+Q3. 一共内置几种切片策略？
+A3. 共七种：固定 Token、语义切块、段落切块、标题层级、问答对、递归切片与 AI 辅助。不同策略适用于不同文档结构，上传…</div>
+</details>
+</div>
+</div></body></html>

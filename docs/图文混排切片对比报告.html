@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang='zh'><head><meta charset='utf-8'>
+<title>图文混排切片对比报告（OCR 文本化）</title>
+
+    <style>
+      body{font-family:-apple-system,'Segoe UI',sans-serif;max-width:1100px;margin:24px auto;padding:0 16px;color:#222;line-height:1.6;background:#fff}
+      h1{color:#1a3c6e}h2{color:#1a3c6e;border-bottom:2px solid #e3e8f0;padding-bottom:6px;margin-top:34px}
+      .meta{color:#666;font-size:14px;background:#f5f8fc;padding:12px 16px;border-radius:8px;border:1px solid #e3e8f0}
+      table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}
+      th,td{border:1px solid #d8dee9;padding:8px 10px;text-align:left;vertical-align:top}
+      th{background:#eef3fb}
+      .old{color:#b00}.new{color:#087a2e}
+      .hit-yes{color:#087a2e;font-weight:600}.hit-no{color:#888}
+      .code{background:#f6f8fa;border:1px solid #e3e8f0;border-radius:6px;padding:10px 12px;
+             white-space:pre-wrap;word-break:break-all;font-family:Consolas,Menlo,monospace;font-size:12.5px;max-height:160px;overflow:auto}
+      .tag-old{background:#fdecea;color:#b00;padding:1px 6px;border-radius:4px;font-size:12px}
+      .tag-new{background:#e7f6ec;color:#087a2e;padding:1px 6px;border-radius:4px;font-size:12px}
+      .note{color:#666;font-size:13px}
+    </style>
+</head><body>
+<h1>图文混排切片对比报告</h1>
+<div class='meta'>
+路线 <b>B. OCR 文本化</b> 演示：对含图片的 Markdown / HTML 文档，对比 <span class='tag-old'>旧行为（无 OCR，图片被当纯文本/被丢弃）</span> 与 <span class='tag-new'>新行为（图片经 mock OCR 文字回填进文本流）</span> 在 7 种切片策略下的差异。OCR 后端当前为 <b>mock</b>（读图片尺寸返回模拟识别文字），接入真实引擎（通义 qwen-vl / 本地 rapidocr）只需替换 <code>get_ocr_backend()</code> 的参数。
+</div>
+<h2>文档：产品说明.md（md）</h2>
+<p class='note'>图片总数：<b>2</b> · 成功 OCR 命中：<b>2</b></p>
+<h3>解析后文本对比（图片如何处理）</h3>
+<p class='tag-old'>旧（无 OCR）</p>
+<div class='code'># 产品说明
+
+本文档介绍我们知识库系统的核心能力与私有化部署方式。
+
+## 系统架构
+
+下图展示了整体架构：
+
+
+[图片: 系统架构图]
+
+
+架构分为接入层、处理层与存储层三层，分别负责请求接入、文档解析切块与向量存储。
+
+## 部署流程
+
+部署时请参考下面的流程图，按步骤执行即可完成私有化部署：
+
+
+[图片: 业务流程图]
+
+
+第一步准备环境，第二步启动服务，第三步导入知识文档。
+
+## 常见问题
+
+问：支持哪些文件格式？
+答：支持 PDF、Word、Markdown、HTML、CSV 等常见格式。
+
+问：图片内容能被检索吗？
+答：开启 OCR 后，图片中的文字会进入切片并被检索。</div>
+<p class='tag-new'>新（mock OCR 回填）</p>
+<div class='code'># 产品说明
+
+本文档介绍我们知识库系统的核心能力与私有化部署方式。
+
+## 系统架构
+
+下图展示了整体架构：
+
+
+[图片OCR 开始]【模拟OCR识别结果】图片《架构图》（格式PNG，宽400高300）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+
+
+架构分为接入层、处理层与存储层三层，分别负责请求接入、文档解析切块与向量存储。
+
+## 部署流程
+
+部署时请参考下面的流程图，按步骤执行即可完成私有化部署：
+
+
+[图片OCR 开始]【模拟OCR识别结果】图片《流程图》（格式PNG，宽500高200）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+
+
+第一步准备环境，第二步启动服务，第三步导入知识文档。
+
+## 常见问题
+
+问：支持哪些文件格式？
+…</div>
+<h3>7 种策略切片对比</h3>
+<table><tr><th>策略</th><th>旧 chunk 数</th><th>新 chunk 数</th><th>新切片命中图片文字</th><th>说明</th></tr>
+<tr><td>固定Token</td><td class='old'>3</td><td class='new'>7</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>语义切块</td><td class='old'>3</td><td class='new'>5</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>段落切块</td><td class='old'>1</td><td class='new'>3</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>标题层级</td><td class='old'>4</td><td class='new'>4</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>问答对</td><td class='old'>2</td><td class='new'>2</td><td class='hit-no'>— 否</td><td class='note'>图片非问答格式，问答策略不产生额外图片块（图片文字仍在文本流中）</td></tr>
+<tr><td>递归切片</td><td class='old'>1</td><td class='new'>2</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>AI辅助(模拟)</td><td class='old'>1</td><td class='new'>3</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+</table>
+<h3>新切片中图片文字落点示例</h3>
+<div class='code'># 产品说明
+
+本文档介绍我们知识库系统的核心能力与私有化部署方式。
+
+## 系统架构
+
+下图展示了整体架构：
+
+
+[图片OCR 开始]【模拟OCR识别结果】图片《架构图》（格式PNG，宽400高300）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]</div>
+<h2>文档：帮助页面.html（html）</h2>
+<p class='note'>图片总数：<b>2</b> · 成功 OCR 命中：<b>2</b></p>
+<h3>解析后文本对比（图片如何处理）</h3>
+<p class='tag-old'>旧（无 OCR）</p>
+<div class='code'>使用帮助
+使用帮助
+欢迎使用知识库系统。下面是主界面截图：
+[图片: 主界面截图]
+快速开始
+参考流程图完成初始化：
+[图片: 业务流程图]
+如有问题请联系系统管理员获取支持。</div>
+<p class='tag-new'>新（mock OCR 回填）</p>
+<div class='code'>使用帮助
+使用帮助
+欢迎使用知识库系统。下面是主界面截图：
+[图片OCR 开始]【模拟OCR识别结果】图片《截图》（格式PNG，宽350高350）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+快速开始
+参考流程图完成初始化：
+[图片OCR 开始]【模拟OCR识别结果】图片《流程图》（格式PNG，宽500高200）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+如有问题请联系系统管理员获取支持。
+
+[图片OCR 开始]【模拟OCR识别结果】图片《截图》（格式PNG，宽350高350）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+
+
+[图片OCR 开始]【模拟OCR识别结果】图…</div>
+<h3>7 种策略切片对比</h3>
+<table><tr><th>策略</th><th>旧 chunk 数</th><th>新 chunk 数</th><th>新切片命中图片文字</th><th>说明</th></tr>
+<tr><td>固定Token</td><td class='old'>2</td><td class='new'>4</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>语义切块</td><td class='old'>1</td><td class='new'>4</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>段落切块</td><td class='old'>1</td><td class='new'>2</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>标题层级</td><td class='old'>1</td><td class='new'>1</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>问答对</td><td class='old'>1</td><td class='new'>1</td><td class='hit-yes'>✅ 是</td><td class='note'>图片非问答格式，问答策略不产生额外图片块（图片文字仍在文本流中）</td></tr>
+<tr><td>递归切片</td><td class='old'>1</td><td class='new'>1</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+<tr><td>AI辅助(模拟)</td><td class='old'>1</td><td class='new'>3</td><td class='hit-yes'>✅ 是</td><td class='note'></td></tr>
+</table>
+<h3>新切片中图片文字落点示例</h3>
+<div class='code'>使用帮助
+使用帮助
+欢迎使用知识库系统。下面是主界面截图：
+[图片OCR 开始]【模拟OCR识别结果】图片《截图》（格式PNG，宽350高350）中的文字内容如下：此处为演示占位文字，接入真实 OCR 引擎后将替换为图片里实际印刷/绘制的文字。[图片OCR 结束]
+快速开始
+参考流程图完成初始化：
+[图片OCR 开始]【模拟OCR识别结果】图片《流程图》（格式PNG，宽500高200）中的文字内容</div>
+<h2>结论</h2>
+<ul><li><b>旧行为</b>：Markdown 的 <code>![](path)</code> 作为纯文本残留在 chunk 中，可能被固定Token/语义策略从中间切断；HTML 的 <code>&lt;img&gt;</code> 被 <code>get_text()</code> 直接丢弃，图片信息完全消失；DOCX 图片仅记文件名、不进 chunk。</li><li><b>新行为（OCR 文本化）</b>：图片被提取并经 OCR 转成文字，回填进文本流（<code>[图片OCR 开始]…[图片OCR 结束]</code>），7 种策略都能把它当正文切片，图片里的文字因此可被检索与问答。</li><li><b>切换真实引擎</b>：把 <code>get_ocr_backend('mock')</code> 改为 <code>get_ocr_backend('tongyi-vl')</code>（需 TONGYI_API_KEY）或 <code>'rapidocr'</code>（需 pip 安装），无需改动 parser 与切片主链路。</li></ul>
+</body></html>
