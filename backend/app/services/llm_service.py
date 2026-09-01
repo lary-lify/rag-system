@@ -4,18 +4,26 @@ Handles multi-turn context, RAG prompt assembly, token counting.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import httpx
-from app.clients.http_client import http_client_context
+from sqlalchemy import select
 
+from app.clients.http_client import http_client_context
+from app.core.cache import make_cache_key, query_rewrite_cache
 from app.core.config import settings
 from app.services.embedding_service import embed_single_text, estimate_token_count
 from app.services.milvus_service import search_vectors
+from app.services.query_rewrite import rewrite_query
 
 logger = logging.getLogger(__name__)
+
+
+# 片段在上下文中的截断长度：过长会把 prompt 撑爆，过短又丢信息
+SNIPPET_MAX_CHARS = 500
 
 SYSTEM_PROMPT = """你是一个企业知识库问答助手。严格遵守以下规则：
 
@@ -25,6 +33,191 @@ SYSTEM_PROMPT = """你是一个企业知识库问答助手。严格遵守以下�
 4. 回答时要完整引用参考资料中的所有相关内容，不要遗漏关键信息（如不同场景下的不同数据）。使用 markdown 格式。
 5. 如果用户的追问（如"那XX呢？"）涉及参考资料中已有的信息，请结合之前的对话上下文来理解问题含义并从参考资料中找到完整答案。
 6. 使用与用户提问相同的语言回答。"""
+
+
+async def _last_question(db, conversation_id: int) -> str | None:
+    """取上一轮问题，用于补全追问里的指代（如"那XX呢？"）。"""
+    from app.models.message import Message
+
+    try:
+        result = await db.execute(
+            select(Message.question)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+    except Exception as e:
+        logger.warning(f"[llm] last question lookup failed: {e}")
+        return None
+
+
+async def _rewrite_with_fallback(question: str, search_query: str) -> str:
+    """
+    查询改写，带开关、超时与缓存。
+
+    改写是挡在检索前的一次完整 LLM 调用，它耗时多久用户就多等多久，
+    且失败不影响主流程的正确性（回退原查询即可），因此必须能关、
+    能超时降级、能缓存复用。
+    """
+    if not settings.QUERY_REWRITE_ENABLED:
+        return search_query
+
+    cache_on = settings.QUERY_REWRITE_CACHE_ENABLED
+    key = make_cache_key("rewrite", search_query) if cache_on else None
+
+    if key:
+        cached = query_rewrite_cache.get(key)
+        if cached is not None:
+            return cached
+
+    try:
+        result = await asyncio.wait_for(
+            rewrite_query(search_query),
+            timeout=max(0.1, float(settings.QUERY_REWRITE_TIMEOUT)),
+        )
+        rewritten = (result or {}).get("rewritten_query") or search_query
+    except asyncio.TimeoutError:
+        logger.warning(f"[llm] query rewrite timed out after {settings.QUERY_REWRITE_TIMEOUT}s")
+        rewritten = search_query
+    except Exception as e:
+        logger.warning(f"[llm] query rewrite failed, using original: {e}")
+        rewritten = search_query
+
+    if key and rewritten:
+        query_rewrite_cache.set(key, rewritten)
+
+    logger.info(f"[query] Original: {question} -> Rewritten: {rewritten}")
+    return rewritten
+
+
+async def _load_kb_configs(db, kb_ids: list[int]) -> dict[int, Any]:
+    """一次查询拿到全部知识库的 embedding 配置，替代逐库查询。"""
+    from app.models.knowledge_base import KnowledgeBase
+
+    if db is None or not kb_ids:
+        return {}
+    try:
+        result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id.in_(kb_ids)))
+        return {kb.id: kb for kb in result.scalars().all()}
+    except Exception as e:
+        logger.warning(f"[llm] KB config lookup failed: {e}")
+        return {}
+
+
+async def _filter_deleted_documents(db, results: list[dict]) -> list[dict]:
+    """剔除已删除文档的片段，一次 IN 查询替代逐库判断。"""
+    from app.models.document import Document
+
+    if db is None or not results:
+        return results
+    doc_ids = {r["document_id"] for r in results if r.get("document_id")}
+    if not doc_ids:
+        return results
+    try:
+        deleted = await db.execute(
+            select(Document.id).where(
+                Document.id.in_(doc_ids),
+                Document.is_deleted == True,  # noqa: E712
+            )
+        )
+    except Exception as e:
+        logger.warning(f"[llm] deleted-document filter failed, keeping all: {e}")
+        return results
+    removed = set(deleted.scalars().all())
+    if not removed:
+        return results
+    return [r for r in results if r.get("document_id") not in removed]
+
+
+async def _resolve_document_names(db, results: list[dict]) -> dict[int, str]:
+    """一次 IN 查询拿到全部文档名。
+
+    原实现对每个命中片段单独查一次文件名：Top-K 命中 N 条就是 N 次
+    数据库往返。检索本身只要几毫秒，补名字反而成为主要耗时。
+    """
+    from app.models.document import Document
+
+    if db is None or not results:
+        return {}
+    doc_ids = {r["document_id"] for r in results if r.get("document_id")}
+    if not doc_ids:
+        return {}
+    try:
+        rows = await db.execute(
+            select(Document.id, Document.original_filename).where(Document.id.in_(doc_ids))
+        )
+        return {doc_id: name for doc_id, name in rows.all() if doc_id is not None}
+    except Exception as e:
+        logger.warning(f"[llm] document name lookup failed: {e}")
+        return {}
+
+
+async def _retrieve_from_kbs(
+    kb_ids: list[int],
+    search_query: str,
+    db,
+) -> list[dict]:
+    """
+    跨知识库并发检索，返回按相关度降序排列的片段。
+
+    原实现串行遍历 kb_ids：K 个知识库就是 K 次串行往返，且每个库内部
+    还要再查一次配置。现按 embedding 配置分组（同配置只向量化一次），
+    组内多库并发，组间也并发。
+    """
+    configs = await _load_kb_configs(db, kb_ids)
+
+    groups: dict[tuple[str, int], list[int]] = {}
+    for kb_id in kb_ids:
+        cfg = configs.get(kb_id)
+        model = cfg.embedding_model if cfg else settings.TONGYI_EMBEDDING_MODEL
+        dim = cfg.embedding_dimensions if cfg else settings.TONGYI_EMBEDDING_DIMENSIONS
+        groups.setdefault((model, dim), []).append(kb_id)
+
+    async def _search_group(model: str, dim: int, ids: list[int]) -> list[dict]:
+        query_vec, _ = await embed_single_text(search_query, model=model, dimensions=dim)
+        per_kb = await asyncio.gather(
+            *[search_vectors(kb_id, query_vec) for kb_id in ids],
+            return_exceptions=True,
+        )
+        hits: list[dict] = []
+        for kb_id, res in zip(ids, per_kb):
+            if isinstance(res, BaseException):
+                logger.warning(f"[llm] KB{kb_id} search failed: {res}")
+                continue
+            for r in res or []:
+                hits.append({**r, "kb_id": kb_id})
+        return hits
+
+    nested = await asyncio.gather(
+        *[_search_group(model, dim, ids) for (model, dim), ids in groups.items()],
+        return_exceptions=True,
+    )
+
+    results: list[dict] = []
+    for group in nested:
+        if isinstance(group, BaseException):
+            logger.warning(f"[llm] KB group search failed: {group}")
+            continue
+        results.extend(group)
+
+    results = await _filter_deleted_documents(db, results)
+    # 并发执行后顺序不再确定，统一按相关度降序，让最相关的片段排在前面
+    results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+
+    doc_names = await _resolve_document_names(db, results)
+    chunks: list[dict] = []
+    for r in results:
+        doc_id = r.get("document_id")
+        chunks.append({
+            "chunk_id": r.get("chunk_id"),
+            "document_id": doc_id,
+            "document_name": doc_names.get(doc_id) or "未知文档",
+            "content": (r.get("content") or "")[:SNIPPET_MAX_CHARS],
+            "score": r.get("score", 0.0),
+            "kb_id": r.get("kb_id"),
+        })
+    return chunks
 
 
 async def stream_chat_response(
@@ -51,96 +244,19 @@ async def stream_chat_response(
     # Build search query: for short follow-ups, prepend the last question
     search_query = question
     if len(question.strip()) < 15 and db and conversation_id:
-        try:
-            from app.models.message import Message
-            from sqlalchemy import select
-            prev = await db.execute(
-                select(Message.question).where(Message.conversation_id == conversation_id)
-                .order_by(Message.created_at.desc()).limit(1)
-            )
-            prev_q = prev.scalar_one_or_none()
-            if prev_q:
-                search_query = f"{prev_q} {question}"
-        except Exception:
-            pass
+        prev_q = await _last_question(db, conversation_id)
+        if prev_q:
+            search_query = f"{prev_q} {question}"
 
-    # Use LLM to rewrite query for better retrieval (with fallback)
-    try:
-        rewrite_result = await rewrite_query(search_query)
-        search_query = rewrite_result["rewritten_query"]
-        logger.info(f"[query] Original: {question} -> Rewritten: {search_query}")
-    except Exception as e:
-        logger.warning(f"[query] Query rewrite failed, using original: {e}")
+    # Use LLM to rewrite query for better retrieval (switchable, cached, time-boxed)
+    search_query = await _rewrite_with_fallback(question, search_query)
 
     if kb_ids:
-        for kb_id in kb_ids:
-            try:
-                # Load KB config for embedding model
-                from app.models.knowledge_base import KnowledgeBase
-                kb_config = None
-                if db:
-                    from sqlalchemy import select as sa_select
-                    kb_result = await db.execute(sa_select(KnowledgeBase).where(KnowledgeBase.id == kb_id))
-                    kb_config = kb_result.scalar_one_or_none()
-
-                embedding_model = kb_config.embedding_model if kb_config else settings.TONGYI_EMBEDDING_MODEL
-                embedding_dimensions = kb_config.embedding_dimensions if kb_config else settings.TONGYI_EMBEDDING_DIMENSIONS
-
-                # Embed query with KB-specific model
-                query_vec, _tok = await embed_single_text(search_query, model=embedding_model, dimensions=embedding_dimensions)
-
-                # Use vector search (fallback to hybrid if configured)
-                from app.services.milvus_service import search_vectors
-                results = await search_vectors(kb_id, query_vec)
-
-                # Filter out deleted documents
-                if db and results:
-                    doc_ids = list({r.get("document_id") for r in results if r.get("document_id")})
-                    if doc_ids:
-                        from app.models.document import Document
-                        del_res = await db.execute(
-                            select(Document.id).where(
-                                Document.id.in_(doc_ids),
-                                Document.is_deleted == True,
-                            )
-                        )
-                        deleted_ids = set(r[0] for r in del_res.fetchall())
-                        if deleted_ids:
-                            results = [r for r in results if r.get("document_id") not in deleted_ids]
-
-                # Use results directly (rerank disabled for stability)
-
-                for r in results:
-                    snippet = r.get("content", "")[:500]
-
-                    # Resolve document name (non-critical, never blocks)
-                    doc_name = "未知文档"
-                    doc_id = r.get("document_id")
-                    if doc_id:
-                        try:
-                            if db:
-                                from app.models.document import Document
-                                doc_res = await db.execute(
-                                    select(Document.original_filename).where(Document.id == doc_id)
-                                )
-                                name_row = doc_res.scalar_one_or_none()
-                                if name_row:
-                                    doc_name = name_row
-                        except Exception:
-                            pass  # name lookup is cosmetic, don't block
-
-                    context_parts.append(
-                        f"[Source (score={r['score']})]: {snippet}"
-                    )
-                    source_chunks_data.append({
-                        "chunk_id": r.get("chunk_id"),
-                        "document_id": doc_id,
-                        "document_name": doc_name,
-                        "content": r.get("content", "")[:500],
-                        "score": r["score"],
-                    })
-            except Exception as e:
-                logger.warning(f"[llm] KB{kb_id} search failed: {e}")
+        source_chunks_data = await _retrieve_from_kbs(kb_ids, search_query, db)
+        context_parts = [
+            f"[Source (score={c['score']})]: {c['content']}"
+            for c in source_chunks_data
+        ]
 
     # 2. Build messages with conversation history
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -148,7 +264,7 @@ async def stream_chat_response(
     # Add previous context from this conversation (last 10 turns)
     if db and conversation_id:
         from app.models.message import Message
-        from sqlalchemy import select
+
         result = await db.execute(
             select(Message).where(Message.conversation_id == conversation_id)
             .order_by(Message.created_at.desc()).limit(20)  # last 10 Q&A pairs
