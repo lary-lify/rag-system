@@ -119,6 +119,19 @@ async def init_db() -> None:
         except Exception:
             pass
 
+    # Migration: allow login_logs.user_id to be NULL so failed attempts by
+    # unknown users (brute-force / typos) can be audited without violating the
+    # FK to users(id). A sentinel 0 previously caused IntegrityError 1452 -> 500
+    # on every invalid-login request.
+    async with engine.begin() as conn:
+        try:
+            await conn.exec_driver_sql(
+                "ALTER TABLE login_logs MODIFY COLUMN user_id INT NULL"
+            )
+            logger.info("login_logs.user_id column migrated (nullable for anonymous attempts).")
+        except Exception:
+            pass
+
     logger.info("Database tables created/verified.")
 
 

@@ -52,9 +52,11 @@ async def login(
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
 
-    # Log attempt regardless of outcome
+    # Log attempt regardless of outcome.
+    # Unknown-user (brute-force) attempts have no FK target, so user_id is NULL
+    # rather than a sentinel 0 that would violate the FK to users(id).
     log = LoginLog(
-        user_id=user.id if user else 0,
+        user_id=user.id if user else None,
         ip_address=ip,
         user_agent=ua,
     )

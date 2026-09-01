@@ -3,6 +3,8 @@ LoginLog ORM model - login audit trail.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,10 +15,10 @@ class LoginLog(Base):
     __tablename__ = "login_logs"
 
     id: Mapped[int] = mapped_column(sa.Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
+    user_id: Mapped[Optional[int]] = mapped_column(
         sa.Integer,
         sa.ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     ip_address: Mapped[str] = mapped_column(sa.String(45), default="")
     user_agent: Mapped[str] = mapped_column(sa.String(512), default="")
