@@ -4,11 +4,18 @@ One collection per knowledge base, with IVF_FLAT index.
 
 IMPORTANT: pymilvus is synchronous. All calls are wrapped in
 run_in_executor to avoid blocking the asyncio event loop.
+
+集合加载策略（P0）：
+    pymilvus 的 Collection.load() 是一次重量级 RPC——它要把索引段从对象存储
+    拉进 QueryNode 内存。原实现每次查询都 load()/release() 一对调用，等于把
+    一次向量检索放大成三次跨进程往返，且两次查询之间 Milvus 侧反复换入换出。
+    现改为加载后常驻，由 MILVUS_AUTO_RELEASE 控制是否退回旧行为。
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import Any
 
 from pymilvus import (
@@ -28,14 +35,46 @@ _MILVUS_ALIAS = "rag_kb_default"
 
 # Thread pool for pymilvus sync operations
 _pool = None
+_pool_lock = threading.Lock()
+
+# 常驻内存的集合句柄：kb_id -> Collection
+# pymilvus 的 Collection 只是轻量句柄，真正的状态在服务端，跨线程复用安全。
+_loaded: dict[int, Collection] = {}
+_loaded_lock = threading.Lock()
 
 
 def _get_pool():
+    """按配置容量惰性创建线程池（双检锁，避免并发首调用重复创建）。"""
     global _pool
     if _pool is None:
-        import concurrent.futures
-        _pool = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="milvus")
+        with _pool_lock:
+            if _pool is None:
+                import concurrent.futures
+
+                workers = max(1, int(settings.MILVUS_POOL_WORKERS))
+                _pool = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=workers, thread_name_prefix="milvus"
+                )
+                logger.info(f"[milvus] Thread pool started (workers={workers})")
     return _pool
+
+
+def shutdown_pool() -> None:
+    """释放线程池与集合句柄缓存，供应用优雅关闭时调用。"""
+    global _pool
+    with _pool_lock:
+        if _pool is not None:
+            _pool.shutdown(wait=False)
+            _pool = None
+    with _loaded_lock:
+        _loaded.clear()
+    logger.info("[milvus] Thread pool shut down")
+
+
+def _forget(kb_id: int) -> None:
+    """丢弃缓存的集合句柄（集合被删除/重建，或需要强制释放时调用）。"""
+    with _loaded_lock:
+        _loaded.pop(kb_id, None)
 
 
 def _connect_sync():
@@ -56,6 +95,7 @@ def _ensure_collection_sync(kb_id: int, dimension=None, recreate=False) -> Colle
     if utility.has_collection(name, using=_MILVUS_ALIAS):
         if recreate:
             utility.drop_collection(name, using=_MILVUS_ALIAS)
+            _forget(kb_id)
         else:
             return Collection(name, using=_MILVUS_ALIAS)
 
@@ -80,7 +120,7 @@ def _ensure_collection_sync(kb_id: int, dimension=None, recreate=False) -> Colle
 
 
 async def ensure_collection(kb_id: int, dimension=None, recreate=False) -> Collection:
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         _get_pool(),
         _ensure_collection_sync, kb_id, dimension, recreate,
@@ -96,7 +136,7 @@ def _insert_vectors_sync(kb_id, chunk_ids, document_ids, contents, vectors, dime
 async def insert_vectors(kb_id, chunk_ids, document_ids, contents, vectors, dimension=None):
     if not chunk_ids:
         return
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         _get_pool(),
         _insert_vectors_sync, kb_id, chunk_ids, document_ids, contents, vectors, dimension,
@@ -104,15 +144,35 @@ async def insert_vectors(kb_id, chunk_ids, document_ids, contents, vectors, dime
     logger.debug(f"[milvus] Inserted {len(chunk_ids)} vectors into KB{kb_id}")
 
 
-def _search_vectors_sync(kb_id, query_vector, top_k, threshold):
+def _get_loaded_collection_sync(kb_id: int) -> Collection | None:
+    """
+    取一个可用于查询的集合：不存在返回 None；存在则确保其已加载。
+
+    常驻模式下命中缓存后不再发 load() RPC。若服务端因内存压力自行释放了
+    集合，search 会抛异常，由 _search_vectors_sync 捕获后重新加载重试。
+    """
     name = _col_name(kb_id)
     _connect_sync()
 
     if not utility.has_collection(name, using=_MILVUS_ALIAS):
-        return []
+        return None
 
-    col = Collection(name, using=_MILVUS_ALIAS)
+    with _loaded_lock:
+        col = _loaded.get(kb_id)
+
+    if col is not None and not settings.MILVUS_AUTO_RELEASE:
+        return col  # 已加载且策略为常驻，跳过 load RPC
+
+    if col is None:
+        col = Collection(name, using=_MILVUS_ALIAS)
     col.load()
+    with _loaded_lock:
+        _loaded[kb_id] = col
+    return col
+
+
+def _do_search(col: Collection, query_vector, top_k, threshold) -> list[dict]:
+    """对已加载的集合执行一次检索。"""
     results = col.search(
         data=[query_vector],
         anns_field="vector",
@@ -129,14 +189,42 @@ def _search_vectors_sync(kb_id, query_vector, top_k, threshold):
                 "content": hit.entity.get("content"),
                 "score": round(float(hit.score), 4),
             })
-    col.release()
     return hits
+
+
+def _release_sync(kb_id: int, col: Collection) -> None:
+    """仅在 MILVUS_AUTO_RELEASE 开启时释放（兼容旧行为，默认关闭）。"""
+    try:
+        col.release()
+    except Exception as e:  # 释放失败不应影响已经拿到的检索结果
+        logger.warning(f"[milvus] release kb_{kb_id} failed: {e}")
+    finally:
+        _forget(kb_id)
+
+
+def _search_vectors_sync(kb_id, query_vector, top_k, threshold):
+    col = _get_loaded_collection_sync(kb_id)
+    if col is None:
+        return []
+    try:
+        return _do_search(col, query_vector, top_k, threshold)
+    except Exception as e:
+        # 服务端侧集合被释放（内存压力、外部手动 release）时重新加载重试一次
+        msg = str(e).lower()
+        if "not loaded" not in msg and "code=101" not in msg:
+            raise
+        logger.warning(f"[milvus] kb_{kb_id} not loaded, reloading and retrying: {e}")
+        col.load()
+        return _do_search(col, query_vector, top_k, threshold)
+    finally:
+        if settings.MILVUS_AUTO_RELEASE:
+            _release_sync(kb_id, col)
 
 
 async def search_vectors(kb_id, query_vector, top_k=None, min_score=None):
     k = top_k or settings.RAG_TOP_K
     threshold = min_score if min_score is not None else settings.RAG_SCORE_THRESHOLD
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         _get_pool(),
         _search_vectors_sync, kb_id, query_vector, k, threshold,
@@ -155,7 +243,7 @@ def _delete_by_chunk_ids_sync(kb_id, chunk_ids):
 async def delete_by_chunk_ids(kb_id, chunk_ids):
     if not chunk_ids:
         return
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         _get_pool(),
         _delete_by_chunk_ids_sync, kb_id, chunk_ids,
@@ -167,10 +255,11 @@ def _drop_collection_sync(kb_id):
     _connect_sync()
     if utility.has_collection(name, using=_MILVUS_ALIAS):
         utility.drop_collection(name, using=_MILVUS_ALIAS)
+    _forget(kb_id)
 
 
 async def drop_collection(kb_id):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         _get_pool(),
         _drop_collection_sync, kb_id,
@@ -188,8 +277,30 @@ def _get_stats_sync(kb_id) -> dict:
 
 
 async def get_stats(kb_id) -> dict:
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         _get_pool(),
         _get_stats_sync, kb_id,
     )
+
+
+async def warmup(kb_ids: list[int]) -> None:
+    """
+    预加载指定知识库的集合，避免首个真实请求承担加载延迟。
+
+    应用启动后调用，可把冷启动的第一跳延迟从"用户承担"挪到"启动阶段承担"。
+    """
+    if not kb_ids:
+        return
+    loop = asyncio.get_running_loop()
+
+    def _warm(kb_id: int) -> None:
+        try:
+            _get_loaded_collection_sync(kb_id)
+        except Exception as e:
+            logger.warning(f"[milvus] warmup kb_{kb_id} failed: {e}")
+
+    await asyncio.gather(*[
+        loop.run_in_executor(_get_pool(), _warm, kb_id) for kb_id in kb_ids
+    ])
+    logger.info(f"[milvus] Warmed up {len(kb_ids)} collection(s)")
