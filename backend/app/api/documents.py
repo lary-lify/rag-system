@@ -1,8 +1,10 @@
 """
 Documents API: file upload, status tracking, deletion.
 """
+import hashlib
 import logging
 import os
+import tempfile
 import uuid
 from datetime import datetime
 
@@ -27,6 +29,9 @@ router = APIRouter()
 
 # Import limiter from core
 from app.core.limiter import limiter
+
+# 流式写盘时的单次读取大小
+UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MiB
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -66,29 +71,52 @@ async def upload_document(
                 f"File type '{ext}' not allowed. Allowed: {settings.upload_allowed_extensions}",
             )
 
-        # Read and validate size
-        content = await upload_file.read()
-        if len(content) > settings.upload_max_bytes:
-            raise HTTPException(
-                413,
-                f"File too large. Max: {settings.UPLOAD_MAX_SIZE_MB}MB",
-            )
+        # Stream to disk while enforcing the size limit.
+        # 原实现 await upload_file.read() 把整个文件读进内存：上传上限
+        # 100MB 时，10 个并发上传就是 1GB 常驻内存，且超限文件要完整
+        # 收完才被发现。改为边收边写，超限立即中断，内存占用恒定为
+        # 一个块大小。文件名依赖内容哈希，先写临时文件再改名。
+        upload_dir = settings.UPLOAD_DIR
+        os.makedirs(upload_dir, exist_ok=True)
 
-        # Generate unique filename
-        file_hash = md5_hash(content.decode('utf-8', errors='replace') + str(uuid.uuid4()))
-        stored_filename = f"{file_hash}.{ext}"
+        hasher = hashlib.md5()
+        file_size = 0
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=upload_dir, suffix=".upload")
+        save_path = None
+        try:
+            with os.fdopen(tmp_fd, "wb") as out:
+                while True:
+                    chunk = await upload_file.read(UPLOAD_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    file_size += len(chunk)
+                    if file_size > settings.upload_max_bytes:
+                        raise HTTPException(
+                            413,
+                            f"File too large. Max: {settings.UPLOAD_MAX_SIZE_MB}MB",
+                        )
+                    hasher.update(chunk)
+                    out.write(chunk)
 
-        # Save to disk
-        save_path = os.path.join(settings.UPLOAD_DIR, stored_filename)
-        with open(save_path, "wb") as f:
-            f.write(content)
+            # Generate unique filename (content hash + random salt)
+            file_hash = md5_hash(hasher.hexdigest() + str(uuid.uuid4()))
+            stored_filename = f"{file_hash}.{ext}"
+            save_path = os.path.join(upload_dir, stored_filename)
+            os.replace(tmp_path, save_path)
+            tmp_path = None  # 已改名，不要在 finally 里删掉正式文件
+        finally:
+            if tmp_path is not None and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError as e:
+                    logger.warning(f"[upload] Failed to remove temp file {tmp_path}: {e}")
 
         # Create DB record
         doc = Document(
             kb_id=kb_id,
             filename=stored_filename,
             original_filename=original_filename,
-            file_size=len(content),
+            file_size=file_size,
             file_type=ext,
             uploader_id=current_user.id,
             chunk_strategy=chunk_strategy,
@@ -112,7 +140,7 @@ async def upload_document(
             detail={
                 "kb_id": kb_id,
                 "original_filename": original_filename,
-                "file_size": len(content),
+                "file_size": file_size,
                 "chunk_strategy": chunk_strategy,
             },
             ip_address=ip,
