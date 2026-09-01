@@ -134,6 +134,11 @@ services:
       - "${APP_PORT:-8000}:8000"
     env_file:
       - .env.docker
+    environment:
+      # 与 config.py 的 APP_WORKERS 共用：既决定 gunicorn worker 数，
+      # 也用于推算数据库连接池总占用，避免打穿 MySQL max_connections
+      APP_WORKERS: ${APP_WORKERS:-2}
+      APP_GRACEFUL_TIMEOUT: ${APP_GRACEFUL_TIMEOUT:-30}
     volumes:
       - upload_data:/app/data/uploads
       - crawl_data:/app/data/crawls
