@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.core.cache import configure_caches
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.limiter import limiter
@@ -38,6 +39,9 @@ async def lifespan(app: FastAPI):
     for d in (settings.UPLOAD_DIR, settings.CRAWL_DIR):
         os.makedirs(d, exist_ok=True)
 
+    # 按配置刷新缓存容量与 TTL（缓存实例在导入时用的是代码内默认值）
+    configure_caches()
+
     await init_db()
 
     # Run database migrations
@@ -54,6 +58,13 @@ async def lifespan(app: FastAPI):
     yield
     # 关闭外部连接（HTTP 连接池 / Milvus）
     await close_http_clients()
+    # 释放常驻集合句柄与线程池，再断开连接，避免关闭时出现半释放状态
+    try:
+        from app.services.milvus_service import shutdown_pool
+
+        shutdown_pool()
+    except Exception as e:
+        logger.warning(f"Milvus pool shutdown skipped: {e}")
     get_milvus_connection().disconnect()
     await close_db()
     logger.info(f"{settings.APP_NAME} stopped.")
