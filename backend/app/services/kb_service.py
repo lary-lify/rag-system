@@ -97,9 +97,11 @@ async def process_document_async(document_id: int, user_id: int) -> None:
             await db.commit()
 
             # Chunk the text
+            # 切分是纯 CPU 操作（ai_assisted 策略内部还会同步调用 LLM），
+            # 直接在事件循环里跑会把其他请求一起卡住，丢线程池执行
             strategy = _get_strategy(doc.chunk_strategy)
             params = dict(doc.chunk_params or {})
-            chunks_result = strategy.split(text, **params)
+            chunks_result = await asyncio.to_thread(strategy.split, text, **params)
 
             # Record AI chunking token usage if the strategy provides it
             ai_usage = getattr(strategy, "get_last_ai_usage", lambda: None)()
@@ -128,7 +130,15 @@ async def process_document_async(document_id: int, user_id: int) -> None:
             contents = [c.content for c in chunks_result]
             try:
                 vectors, embed_tokens = await asyncio.wait_for(
-                    embed_texts(contents, model=embedding_model, dimensions=embedding_dimensions), timeout=180
+                    embed_texts(
+                        contents,
+                        model=embedding_model,
+                        dimensions=embedding_dimensions,
+                        # 入库不写缓存：一次性涌入的成千上万条片段会把
+                        # 查询向量从 LRU 里挤出去，反而抹平缓存收益
+                        use_cache=False,
+                    ),
+                    timeout=180,
                 )
             except asyncio.TimeoutError:
                 raise TimeoutError("Embedding API timed out after 180s")
@@ -139,10 +149,10 @@ async def process_document_async(document_id: int, user_id: int) -> None:
                 )
 
             # Step 4: Store chunks in DB + Milvus
-            db_chunk_ids = []
-            milvus_chunk_ids = []
-            for i, cr in enumerate(chunks_result):
-                db_chunk = Chunk(
+            # 逐条 add + flush 意味着每条一次数据库往返，一份 500 片段的
+            # 文档就是 500 次。改为批量 add 后一次 flush 取回全部自增 ID。
+            db_chunks = [
+                Chunk(
                     document_id=doc.id,
                     kb_id=doc.kb_id,
                     content=cr.content,
@@ -150,11 +160,14 @@ async def process_document_async(document_id: int, user_id: int) -> None:
                     token_count=cr.token_count or estimate_token_count(cr.content),
                     chunk_meta=cr.metadata,
                 )
-                db.add(db_chunk)
-                await db.flush()  # get auto-generated ID
-                db_chunk_ids.append(db_chunk.id)
-                # Use DB ID as Milvus primary key for easy mapping
-                milvus_chunk_ids.append(db_chunk.id)
+                for cr in chunks_result
+            ]
+            db.add_all(db_chunks)
+            await db.flush()
+
+            db_chunk_ids = [c.id for c in db_chunks]
+            # Use DB ID as Milvus primary key for easy mapping
+            milvus_chunk_ids = list(db_chunk_ids)
 
             doc.chunk_count = len(chunks_result)
             doc.status = DocumentStatus.completed
@@ -180,11 +193,13 @@ async def process_document_async(document_id: int, user_id: int) -> None:
                     )
 
             # Update Milvus IDs on chunks
-            for cid, mid in zip(db_chunk_ids, milvus_chunk_ids):
+            # Milvus 主键直接复用数据库 chunk id，原实现逐条 UPDATE 把
+            # 同一个值写回同一行，N 个片段就是 N 次往返。一条语句即可。
+            if db_chunk_ids:
                 await db.execute(
                     Chunk.__table__.update()
-                    .where(Chunk.id == cid)
-                    .values(milvus_id=mid)
+                    .where(Chunk.id.in_(db_chunk_ids))
+                    .values(milvus_id=Chunk.id)
                 )
             await db.commit()
 
@@ -245,25 +260,38 @@ async def process_document_async(document_id: int, user_id: int) -> None:
 # ---- File Parsers ----
 
 async def _parse_file(file_path: str, file_type: str) -> str:
-    """Parse uploaded file to plain text based on extension."""
+    """
+    Parse uploaded file to plain text based on extension.
+
+    解析是同步且耗时的操作：PDF 要逐页解文本，DOCX 要解包 XML，开了 OCR
+    的话还要对每张图做一次视觉推理。直接调用会把事件循环整个占住，期间
+    所有其他请求都得不到调度——一个 50 页 PDF 能让整个服务停摆好几秒。
+    丢到线程池里跑，事件循环保持可调度。
+    """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    # Use intelligent parser for supported types
-    if file_type in ("docx", "doc", "html", "htm", "txt", "md", "pdf"):
-        from app.services.document_parser import parse_document_intelligently, format_structured_content
-        parsed = parse_document_intelligently(file_path, file_type)
-        return format_structured_content(parsed)
+    def _parse_sync() -> str:
+        # Use intelligent parser for supported types
+        if file_type in ("docx", "doc", "html", "htm", "txt", "md", "pdf"):
+            from app.services.document_parser import (
+                parse_document_intelligently,
+                format_structured_content,
+            )
+            parsed = parse_document_intelligently(file_path, file_type)
+            return format_structured_content(parsed)
 
-    match file_type:
-        case "pptx":
-            return _parse_pptx(file_path)
-        case "csv":
-            return _parse_csv(file_path)
-        case "xlsx" | "xls":
-            return _parse_excel(file_path)
-        case _:
-            return _parse_unstructured(file_path)
+        match file_type:
+            case "pptx":
+                return _parse_pptx(file_path)
+            case "csv":
+                return _parse_csv(file_path)
+            case "xlsx" | "xls":
+                return _parse_excel(file_path)
+            case _:
+                return _parse_unstructured(file_path)
+
+    return await asyncio.to_thread(_parse_sync)
 
 
 def _parse_pdf(path: str) -> str:
