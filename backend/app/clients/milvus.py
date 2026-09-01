@@ -7,6 +7,7 @@ Milvus 连接单例（ORM alias 风格，兼容现有 milvus_service.py 使用�
 from __future__ import annotations
 
 import logging
+import threading
 
 from pymilvus import connections
 
@@ -16,34 +17,43 @@ logger = logging.getLogger(__name__)
 
 _MILVUS_ALIAS = "rag_kb_default"
 _connected = False
+_connect_lock = threading.Lock()
 
 
 class MilvusConnection:
-    """pymilvus connections 的轻量单例封装（alias=rag_kb_default）。"""
+    """pymilvus connections 的轻量单例封装（alias=rag_kb_default）。
+
+    连接池化后会有多个线程同时进入 connect()，此处加锁保证只建连一次，
+    否则后到的线程会覆盖前一条连接，前一条泄漏且句柄失效。
+    """
 
     def connect(self) -> None:
         global _connected
         if _connected:
             return
-        try:
-            connections.get_connection(_MILVUS_ALIAS)
-            _connected = True
-        except Exception:
-            connections.connect(
-                alias=_MILVUS_ALIAS,
-                host=settings.MILVUS_HOST,
-                port=settings.MILVUS_PORT,
-            )
-            _connected = True
-        logger.info(f"Milvus connected (alias={_MILVUS_ALIAS})")
+        with _connect_lock:
+            if _connected:
+                return
+            try:
+                connections.get_connection(_MILVUS_ALIAS)
+                _connected = True
+            except Exception:
+                connections.connect(
+                    alias=_MILVUS_ALIAS,
+                    host=settings.MILVUS_HOST,
+                    port=settings.MILVUS_PORT,
+                )
+                _connected = True
+            logger.info(f"Milvus connected (alias={_MILVUS_ALIAS})")
 
     def disconnect(self) -> None:
         global _connected
-        try:
-            connections.disconnect(_MILVUS_ALIAS)
-        except Exception as e:
-            logger.warning(f"Milvus disconnect warning: {e}")
-        _connected = False
+        with _connect_lock:
+            try:
+                connections.disconnect(_MILVUS_ALIAS)
+            except Exception as e:
+                logger.warning(f"Milvus disconnect warning: {e}")
+            _connected = False
 
 
 _connection = MilvusConnection()
