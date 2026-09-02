@@ -71,20 +71,26 @@ async def _rewrite_with_fallback(question: str, search_query: str) -> str:
         if cached is not None:
             return cached
 
+    rewritten = search_query
+    succeeded = False
     try:
         result = await asyncio.wait_for(
             rewrite_query(search_query),
             timeout=max(0.1, float(settings.QUERY_REWRITE_TIMEOUT)),
         )
-        rewritten = (result or {}).get("rewritten_query") or search_query
+        candidate = (result or {}).get("rewritten_query")
+        if candidate:
+            rewritten = candidate
+            succeeded = True
     except asyncio.TimeoutError:
         logger.warning(f"[llm] query rewrite timed out after {settings.QUERY_REWRITE_TIMEOUT}s")
-        rewritten = search_query
     except Exception as e:
         logger.warning(f"[llm] query rewrite failed, using original: {e}")
-        rewritten = search_query
 
-    if key and rewritten:
+    # 只缓存真正改写成功的结果。
+    # 若把降级后的原查询也写进缓存，上游一次抖动会被固化成整个 TTL 内的
+    # 长期降级——上游恢复后该问题仍命中缓存，再也不会去尝试改写。
+    if key and succeeded:
         query_rewrite_cache.set(key, rewritten)
 
     logger.info(f"[query] Original: {question} -> Rewritten: {rewritten}")
