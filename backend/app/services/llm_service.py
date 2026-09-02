@@ -211,6 +211,19 @@ async def _retrieve_from_kbs(
     # 并发执行后顺序不再确定，统一按相关度降序，让最相关的片段排在前面
     results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
 
+    # 全局 Top-K 截断。
+    # RAG_TOP_K 限定的是「每个知识库」的召回量，跨 N 个库并发检索后候选池
+    # 是 N x RAG_TOP_K 条；若不经截断全部拼进 prompt，知识库越多噪声越多——
+    # 一是把真正相关的片段挤到中间（lost-in-the-middle），二是无谓抬高
+    # input token 成本。截断放在过滤已删文档之后，避免把名额浪费在无效片段上。
+    global_top_k = int(settings.RAG_GLOBAL_TOP_K or 0)
+    if global_top_k > 0 and len(results) > global_top_k:
+        logger.debug(
+            f"[llm] global top-k truncation: {len(results)} -> {global_top_k} "
+            f"across {len(kb_ids)} KB(s)"
+        )
+        results = results[:global_top_k]
+
     doc_names = await _resolve_document_names(db, results)
     chunks: list[dict] = []
     for r in results:

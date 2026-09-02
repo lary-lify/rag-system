@@ -89,7 +89,13 @@ class Settings(BaseSettings):
     DEFAULT_CHUNK_OVERLAP: int = 128
 
     # ---- RAG retrieval ----
+    # RAG_TOP_K 是每个知识库各自的召回上限，也是「最终喂给 LLM 的片段数」的
+    # 默认上限。跨 N 个知识库检索时，各库各召回 RAG_TOP_K 条，合并后最多
+    # RAG_TOP_K x N 条——全部进 prompt 会稀释注意力（lost-in-the-middle）
+    # 并推高 cost，因此合并后还要再做一次全局截断。
     RAG_TOP_K: int = 5
+    # 合并后全局保留的片段数上限。<=0 表示不截断（保留旧行为）。
+    RAG_GLOBAL_TOP_K: int = 5
     RAG_SCORE_THRESHOLD: float = 0.3
     RAG_RETRIEVE_MODE: Literal["vector", "keyword", "mix"] = "mix"  # type: ignore[assignment]
 
