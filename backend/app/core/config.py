@@ -102,7 +102,11 @@ class Settings(BaseSettings):
     # ---- Deployment / 进程模型 ----
     # gunicorn worker 数。连接池容量按 worker 数推算，多副本部署时必须与实际一致，
     # 否则会放大 MySQL 连接数（worker 数 x 单 worker 池上限）。
-    APP_WORKERS: int = 1
+    #
+    # 这里是唯一真源：Dockerfile 与 compose 的兜底值必须与此相同，否则同一份
+    # 代码在容器内外会算出不同的连接池预算。改这里时要同步改那两处。
+    # 本地开发跑单进程 uvicorn 时，在 .env 里显式设 APP_WORKERS=1 覆盖。
+    APP_WORKERS: int = 2
     # SQL 回显开关。None 表示跟随 APP_DEBUG；生产环境建议显式设为 False，
     # 否则每条 SQL 都会落日志，高并发下日志 IO 本身就是瓶颈。
     SQL_ECHO: bool | None = None
@@ -112,6 +116,10 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW_PER_WORKER: int = 10
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+    # MySQL 侧 max_connections 的预算上限，仅用于启动期核对与告警。
+    # MySQL 社区版默认 151，改过服务端配置后同步改这里，否则告警会误报。
+    # 留够余量：应用之外还有管理连接、其他服务与备份任务会占用连接。
+    DB_MAX_CONNECTIONS_BUDGET: int = 151
 
     # ---- 共享 HTTP 连接池（DeepSeek / Tongyi 等外部 API） ----
     HTTP_MAX_CONNECTIONS: int = 200

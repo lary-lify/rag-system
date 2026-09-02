@@ -25,6 +25,33 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+def _log_capacity_budget() -> None:
+    """
+    启动期打印连接池预算，让「worker 数 x 连接池」的放大效应可见。
+
+    MySQL 的 max_connections 是全局的，而连接池是按进程建的：每个 gunicorn
+    worker 都会独立持有一份。调大 APP_WORKERS 或调大单 worker 池上限，都会
+    成倍放大总连接数。这个乘法不直观，且不设防——超了的表现是运行中随机
+   抛 "Too many connections"，排查时很难联想到是 worker 数改过。
+    """
+    total = settings.db_total_connections
+    budget = settings.DB_MAX_CONNECTIONS_BUDGET
+    logger.info(
+        f"[capacity] workers={settings.APP_WORKERS} "
+        f"pool/worker={settings.DB_POOL_SIZE_PER_WORKER}"
+        f"+{settings.DB_MAX_OVERFLOW_PER_WORKER} "
+        f"-> MySQL connections at full load: {total} (budget {budget})"
+    )
+    if total > budget:
+        logger.warning(
+            f"[capacity] 连接池打满时会占用 {total} 个 MySQL 连接，已超过预算 "
+            f"{budget}（MySQL max_connections 默认 151）。超限后新请求会随机抛 "
+            f"'Too many connections'。请下调 APP_WORKERS / DB_POOL_SIZE_PER_WORKER / "
+            f"DB_MAX_OVERFLOW_PER_WORKER，或调高服务端 max_connections 并同步 "
+            f"DB_MAX_CONNECTIONS_BUDGET。"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
@@ -41,6 +68,7 @@ async def lifespan(app: FastAPI):
 
     # 按配置刷新缓存容量与 TTL（缓存实例在导入时用的是代码内默认值）
     configure_caches()
+    _log_capacity_budget()
 
     await init_db()
 
