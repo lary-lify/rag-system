@@ -183,7 +183,20 @@ async def process_document_async(document_id: int, user_id: int) -> None:
             await db.commit()
 
             # Insert into Milvus
-            if vectors and db_chunk_ids:
+            #
+            # milvus_id 是「该片段的向量确实已写进向量库」的标志位，只能由
+            # 真实的写入成功来置位。原实现把超时 catch 掉只打一行 warning，
+            # 随后仍无条件回填 milvus_id，于是向量库里根本不存在的片段也被
+            # 标记成已入库：检索静默漏召，全链路没有任何报错，运维无从发现。
+            #
+            # 这里改为：失败一律不置位，并把可补偿信息落到 documents.error_msg，
+            # 运维可用 `SELECT ... FROM chunks WHERE milvus_id IS NULL` 找出待补偿片段。
+            milvus_ok = False
+            if not vectors:
+                logger.error(
+                    f"[pipeline] no vectors produced for doc {document_id}, skipping Milvus insert"
+                )
+            elif db_chunk_ids:
                 try:
                     await asyncio.wait_for(
                         insert_vectors(
@@ -196,19 +209,47 @@ async def process_document_async(document_id: int, user_id: int) -> None:
                         ),
                         timeout=60,
                     )
+                    milvus_ok = True
                 except asyncio.TimeoutError:
-                    logger.warning(
-                        f"[pipeline] Milvus insert timed out for doc {document_id}, chunks saved to DB only"
+                    logger.error(
+                        f"[pipeline] Milvus insert timed out for doc {document_id} "
+                        f"({len(db_chunk_ids)} chunks): text saved to DB, vectors NOT indexed"
+                    )
+                except Exception as e:
+                    # 原实现只 catch TimeoutError，其余异常会直接冒泡中断流程；
+                    # 这里统一接住，保证「文本已入库」这个既成事实不被回滚，
+                    # 同时如实记录向量侧的失败。
+                    logger.error(
+                        f"[pipeline] Milvus insert failed for doc {document_id} "
+                        f"({len(db_chunk_ids)} chunks): {e}. "
+                        f"text saved to DB, vectors NOT indexed",
+                        exc_info=True,
                     )
 
-            # Update Milvus IDs on chunks
+            # Update Milvus IDs on chunks — only for chunks actually in Milvus.
             # Milvus 主键直接复用数据库 chunk id，原实现逐条 UPDATE 把
             # 同一个值写回同一行，N 个片段就是 N 次往返。一条语句即可。
-            if db_chunk_ids:
+            if milvus_ok and db_chunk_ids:
                 await db.execute(
                     Chunk.__table__.update()
                     .where(Chunk.id.in_(db_chunk_ids))
                     .values(milvus_id=Chunk.id)
+                )
+            elif db_chunk_ids:
+                # 文档正文仍可查（列表/下载不受影响），但向量检索查不到，
+                # 如实写进文档错误信息，避免用户以为入库已全部完成。
+                # 用显式 UPDATE 而非 doc.error_msg = ... ：doc 在前面的
+                # commit 之后已过期，异步下触碰 ORM 属性会触发惰性加载报错。
+                await db.execute(
+                    Document.__table__.update()
+                    .where(Document.id == doc.id)
+                    .values(error_msg=(
+                        f"文本已入库，但向量未写入（{len(db_chunk_ids)} 个片段待补偿）"
+                    ))
+                )
+                logger.error(
+                    f"[pipeline] doc {document_id} marked text-only: "
+                    f"{len(db_chunk_ids)} chunk(s) have no vector, needs re-index"
                 )
             await db.commit()
 
