@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 # 可重试的状态码：限流与服务端错误；4xx 客户端错误重试无意义，直接抛出
 _RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 
+
+class EmbeddingError(RuntimeError):
+    """
+    上游返回的向量与输入无法一一对齐时抛出。
+
+    这类错误重试通常也拿到同样的结果（属于请求/响应契约问题而非抖动），
+    且绝不能用空向量静默补齐——空向量写进 Milvus 要么维度不匹配直接报错，
+    要么变成全 0 向量污染检索，两种后果都比显式失败更糟。
+    """
+
 _semaphore: asyncio.Semaphore | None = None
 
 
@@ -74,15 +84,25 @@ async def _embed_batch(
 
                 usage = data.get("usage", {})
                 embeddings = data.get("data", [])
-                # 上游不保证返回顺序，按 index 归位后再取向量
-                embeddings.sort(key=lambda x: x.get("index", 0))
-                vectors = [e["embedding"] for e in embeddings]
-                if len(vectors) != len(batch):
-                    logger.warning(
-                        f"[embedding] batch size mismatch: asked {len(batch)}, got {len(vectors)}"
+
+                # 上游不保证返回顺序，按 index 建映射再按输入顺序取值。
+                # 这里不能容忍缺失：少一个向量就意味着后续片段会错位或被
+                # 空向量占位，而空向量写入向量库是静默的数据污染，必须显式失败。
+                by_index = {e.get("index"): e.get("embedding") for e in embeddings}
+                missing = [i for i in range(len(batch)) if i not in by_index]
+                if missing:
+                    raise EmbeddingError(
+                        f"embedding result misaligned: asked {len(batch)}, "
+                        f"got {len(embeddings)}, missing index(es) {missing[:10]}"
+                        f"{' ...' if len(missing) > 10 else ''}"
                     )
+                vectors = [by_index[i] for i in range(len(batch))]
                 return vectors, usage.get("total_tokens", 0)
 
+            except EmbeddingError:
+                # 数据对齐问题，重试无意义
+                logger.error("[embedding] result misaligned, not retrying")
+                raise
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
                 last_error = e
@@ -170,6 +190,12 @@ async def embed_texts(
         # 3) 按输入顺序归位
         for batch, (vectors, tokens) in zip(batches, outputs):
             total_tokens += tokens
+            # zip 会在较短的一侧静默截断，上游少返回时会被悄悄吃掉，
+            # 这里必须显式校验，否则缺失项会变成空向量流入向量库。
+            if len(vectors) != len(batch):
+                raise EmbeddingError(
+                    f"embedding batch misaligned: asked {len(batch)}, got {len(vectors)}"
+                )
             for text, vector in zip(batch, vectors):
                 if cache_on:
                     embedding_cache.set(_cache_key(model_name, dim, text), vector)
@@ -181,8 +207,16 @@ async def embed_texts(
         f"tokens={total_tokens} cache={embedding_cache.stats()['hit_rate']}"
     )
 
-    # 理论上不应存在 None；极端情况下上游少返回时用空向量占位，保持顺序对齐
-    return [v if v is not None else [] for v in results], total_tokens
+    # 兜底自检：走到这里仍有 None 说明归位逻辑有漏洞，宁可显式报错，
+    # 也不能让空向量混进入库链路。
+    missing = [i for i, v in enumerate(results) if v is None]
+    if missing:
+        raise EmbeddingError(
+            f"embedding incomplete: {len(missing)}/{len(texts)} text(s) not embedded "
+            f"(first missing index {missing[0]})"
+        )
+
+    return results, total_tokens  # type: ignore[return-value]
 
 
 async def embed_single_text(
