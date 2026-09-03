@@ -271,3 +271,28 @@ class AuditLogListResponse(BaseModel):
 # ---- Config (read-only view) ----
 class ConfigViewResponse(BaseModel):
     config_items: list[dict]  # [{key, value, description}]
+
+
+class CacheStatsItem(BaseModel):
+    """单个进程内缓存的运行统计。"""
+
+    name: str
+    size: int  # 当前条目数
+    max_size: int  # 容量上限，size 长期贴着它就是容量配小了
+    ttl: float
+    hits: int
+    misses: int
+    computations: int  # 未命中后真实计算的次数
+    evictions: int  # 因容量被 LRU 淘汰
+    expirations: int  # 因 TTL 到期失效
+    hit_rate: float  # 0~1
+    # 容量被打满时淘汰会加速，命中率下滑的第一个信号看这里
+    utilization: float  # size / max_size，0~1
+    # 多 worker 部署时本进程只看到全局流量的一部分，读数需按 worker 数折算
+    worker_count: int
+
+
+class CacheStatsResponse(BaseModel):
+    caches: list[CacheStatsItem]
+    # 本进程视角；多 worker 下每个 worker 一份，需逐个采集后汇总
+    process_note: str

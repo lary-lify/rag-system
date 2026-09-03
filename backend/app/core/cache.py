@@ -151,9 +151,10 @@ class TTLCache:
     # ---- 观测 ----
 
     def stats(self) -> dict[str, Any]:
+        size = len(self._data)
         return {
             "name": self.name,
-            "size": len(self._data),
+            "size": size,
             "max_size": self.max_size,
             "ttl": self.ttl,
             "hits": self._stats.hits,
@@ -162,6 +163,9 @@ class TTLCache:
             "evictions": self._stats.evictions,
             "expirations": self._stats.expirations,
             "hit_rate": round(self._stats.hit_rate, 4),
+            # 容量水位：长期贴着 1 说明缓存装不下工作集，淘汰在持续发生，
+            # 这时提命中率的手段是调大 max_size，而不是调 TTL。
+            "utilization": round(size / self.max_size, 4) if self.max_size else 0.0,
         }
 
 
@@ -204,4 +208,20 @@ def configure_caches() -> None:
     logger.info(
         f"[cache] configured: embedding(max={embedding_cache.max_size}, ttl={embedding_cache.ttl}s), "
         f"rewrite(max={query_rewrite_cache.max_size}, ttl={query_rewrite_cache.ttl}s)"
+    )
+
+    # 容量与内存占用本来是「配了就看不见」的东西：调大能提命中率，代价是
+    # 常驻内存，而这两个缓存每进程一份，真实开销要按 worker 数放大。启动时
+    # 把这笔账算出来，避免线上内存悄悄涨上去才发现是缓存配大了。
+    #
+    # 单条量级是估算：embedding 存 1024 维 float 列表，Python 下每个 float
+    # 对象 24B 加 8B 指针 ≈ 32B/维，一条约 32KB；rewrite 存短字符串，按
+    # 2KB/条估。量级对就够，不追求精确。
+    est_bytes = embedding_cache.max_size * 32 * 1024 + query_rewrite_cache.max_size * 2 * 1024
+    workers = max(1, int(settings.APP_WORKERS))
+    logger.info(
+        f"[cache] 估算内存 ≈ {est_bytes / 1024 / 1024:.1f} MiB/进程，"
+        f"按 APP_WORKERS={workers} 折算全机 ≈ {est_bytes * workers / 1024 / 1024:.1f} MiB；"
+        f"缓存每进程一份，worker 越多单条命中率越低（同一 query 只会落到其中"
+        f"一个 worker），接 Redis 后可统一，届时本日志的折算方式同步失效。"
     )
