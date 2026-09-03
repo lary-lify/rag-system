@@ -59,16 +59,64 @@ def _get_pool():
     return _pool
 
 
-def shutdown_pool() -> None:
-    """释放线程池与集合句柄缓存，供应用优雅关闭时调用。"""
+def shutdown_pool(timeout: float | None = None) -> None:
+    """关闭线程池：先等一等在途任务，超时再取消尚未开始的。
+
+    原实现是 shutdown(wait=False)——立刻返回，一个在途任务都不等。但优雅
+    关闭窗口（gunicorn --graceful-timeout，默认 30s）本来就是留给在途请求的：
+    向量写入是入库流水线的最后一棒，在这一刻被丢掉，会留下「MySQL 里有
+    chunk、Milvus 里没有向量」的半截数据，重启后也不会自动补。
+
+    ThreadPoolExecutor.shutdown() 没有 timeout 参数，wait=True 会无限期阻塞。
+    所以把阻塞的那个 shutdown 丢到后台线程，主线程只 join 到预算上限：
+
+    - 预算内跑完：等价于 wait=True，数据完整，无副作用
+    - 超时：用 cancel_futures 取消队列里尚未开始的任务，已经在执行的任务
+      无法中断（Python 没有安全杀线程的手段），只能随进程退出被回收，
+      并留下明确告警——这类中断对应的是需要人工补偿的数据，静默吞掉最危险
+
+    预算取自 MILVUS_SHUTDOWN_TIMEOUT，必须小于 gunicorn 的
+    --graceful-timeout，否则窗口先被耗尽、进程吃 SIGKILL，等待形同虚设。
+    """
     global _pool
+
+    budget = settings.MILVUS_SHUTDOWN_TIMEOUT if timeout is None else float(timeout)
+
+    # 先摘掉全局引用并清句柄缓存：新来的调用不会再往池里投任务，
+    # 等待的只是一批有界的存量任务。
     with _pool_lock:
-        if _pool is not None:
-            _pool.shutdown(wait=False)
-            _pool = None
+        pool, _pool = _pool, None
     with _loaded_lock:
         _loaded.clear()
-    logger.info("[milvus] Thread pool shut down")
+
+    if pool is None:
+        return
+
+    if budget <= 0:
+        pool.shutdown(wait=False, cancel_futures=True)
+        logger.info("[milvus] Thread pool shut down immediately (no wait)")
+        return
+
+    waiter = threading.Thread(
+        target=pool.shutdown,
+        kwargs={"wait": True},
+        name="milvus-pool-shutdown",
+        daemon=True,
+    )
+    waiter.start()
+    waiter.join(budget)
+
+    if waiter.is_alive():
+        # 超时：清掉排队中的任务，免得关停瞬间又拉起一批新的向量写入
+        pool.shutdown(wait=False, cancel_futures=True)
+        logger.warning(
+            f"[milvus] 线程池关闭等待超时（{budget}s），已取消尚未开始的任务；"
+            f"正在执行的向量读写将无法完成，可能出现 chunk 已入库而向量缺失，"
+            f"需要重新处理对应文档。可调大 MILVUS_SHUTDOWN_TIMEOUT 或排查 "
+            f"Milvus 侧延迟。"
+        )
+    else:
+        logger.info("[milvus] Thread pool shut down gracefully (in-flight tasks drained)")
 
 
 def _forget(kb_id: int) -> None:
