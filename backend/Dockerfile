@@ -20,6 +20,23 @@ COPY . .
 
 EXPOSE 8000
 
+# 容器探活
+# --------
+# --timeout 0 关掉了 gunicorn 对卡死 worker 的自检，兜底必须由外部补上，
+# 否则 worker 一旦卡死（死循环、上游连接泄漏）会一直挂着，对外仍占着
+# worker 名额却不干活，表现是「服务没崩但部分请求永远无响应」。
+#
+# /api/health 是匿名端点，不查库不查 Milvus，只验证事件循环还在转——
+# 探活要能区分「服务在跑」和「依赖在跑」，依赖挂了应该靠告警而不是让
+# 编排层反复重启容器（重启治不好 MySQL 不可用，只会放大故障）。
+#
+# start-period 覆盖首次启动的一次性工作：建表、embedding 迁移、建超管。
+# 这段时间内探活失败是预期的，不算 unhealthy。给 90s 留足余量。
+#
+# retries=3 是容忍偶发抖动（如 GC 停顿），连续 3 次失败才判定不健康。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
+
 # 进程模型
 # --------
 # 单进程 uvicorn 只能用满一个核，其余核全程空闲，是这套服务最大的一块
