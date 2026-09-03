@@ -105,3 +105,9 @@ Desktop.ini
 
 # ---------- 9. 运行产物（脚本生成，非源码） ----------
 backend/outputs/
+
+# ---------- 10. Windows 保留设备名 ----------
+# 在 Git Bash 里写 2>/dev/null 时，Windows 不认 /dev/null，会在当前目录
+# 真实创建一个名为 nul 的 0 字节文件。它是保留设备名，rm / del 都删不掉，
+# 但会一直挂在 git status 里污染工作区，所以显式忽略。
+nul
