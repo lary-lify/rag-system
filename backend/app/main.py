@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -52,6 +53,64 @@ def _log_capacity_budget() -> None:
         )
 
 
+def _cleanup_upload_staging() -> None:
+    """启动期回收上次运行遗留的上传临时文件。
+
+    流式上传是先写临时文件、再 os.replace 原子改名到正式目录，正常路径下
+    临时文件活不过一次请求。但进程被 kill（OOM、强制重启、容器被 SIGKILL）
+    时 finally 根本不执行，文件就留在磁盘上了——既占空间，也在正式文件堆里
+    留下一批无法归属的 .upload 文件。
+
+    两条约束缺一不可：
+
+    1. 只扫 .staging 子目录，不碰正式文件目录。作用域封闭，误伤半径可控，
+       不会出现「清了个正被引用的正式文档」。
+    2. 只清年龄超过 UPLOAD_STAGING_MAX_AGE_SECONDS 的文件。gunicorn 多
+       worker 下每个 worker 都会各跑一遍启动逻辑，晚起的 worker 会看到早起
+       worker 正在写入的临时文件；不设年龄门槛就会删掉别人的在途上传，
+       表现是「偶发上传失败且没有任何报错线索」。门槛取 1 小时，远大于
+       单次上传耗时，只回收确定已成垃圾的残留。
+    """
+    staging = settings.upload_staging_dir
+    if not os.path.isdir(staging):
+        return
+
+    max_age = max(0, int(settings.UPLOAD_STAGING_MAX_AGE_SECONDS))
+    now = time.time()
+    removed = 0
+    skipped = 0
+    freed = 0
+
+    try:
+        for name in os.listdir(staging):
+            path = os.path.join(staging, name)
+            try:
+                st = os.stat(path)
+            except OSError:
+                continue
+            if not os.path.isfile(path):
+                continue
+            if now - st.st_mtime < max_age:
+                skipped += 1
+                continue
+            try:
+                os.unlink(path)
+            except OSError as e:
+                logger.warning(f"[upload] 清理暂存残留失败 {path}: {e}")
+                continue
+            removed += 1
+            freed += st.st_size
+    except OSError as e:
+        logger.warning(f"[upload] 扫描暂存目录失败 {staging}: {e}")
+        return
+
+    if removed or skipped:
+        logger.info(
+            f"[upload] staging cleanup: removed={removed} "
+            f"({freed / 1024 / 1024:.1f} MiB), kept_recent={skipped}, dir={staging}"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
@@ -63,8 +122,11 @@ async def lifespan(app: FastAPI):
         )
 
     # Ensure upload directories exist
-    for d in (settings.UPLOAD_DIR, settings.CRAWL_DIR):
+    for d in (settings.UPLOAD_DIR, settings.CRAWL_DIR, settings.upload_staging_dir):
         os.makedirs(d, exist_ok=True)
+    # 回收上次异常退出遗留的上传临时文件（只清超过年龄门槛的，避免误删
+    # 兄弟 worker 的在途上传）
+    _cleanup_upload_staging()
 
     # 按配置刷新缓存容量与 TTL（缓存实例在导入时用的是代码内默认值）
     configure_caches()

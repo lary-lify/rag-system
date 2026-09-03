@@ -77,11 +77,17 @@ async def upload_document(
         # 收完才被发现。改为边收边写，超限立即中断，内存占用恒定为
         # 一个块大小。文件名依赖内容哈希，先写临时文件再改名。
         upload_dir = settings.UPLOAD_DIR
+        # 临时文件写进 UPLOAD_DIR 下的 .staging 子目录，不落在正式文件堆里：
+        # 进程被 kill 时 finally 不执行，混放的 .upload 残骸只能靠扩展名在
+        # 正式文件里翻找，而独立子目录的清理作用域是确定的（见 main.py 的
+        # 启动清理）。子目录与正式目录同一文件系统，os.replace 仍是原子改名。
+        staging_dir = settings.upload_staging_dir
         os.makedirs(upload_dir, exist_ok=True)
+        os.makedirs(staging_dir, exist_ok=True)
 
         hasher = hashlib.md5()
         file_size = 0
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=upload_dir, suffix=".upload")
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=staging_dir, suffix=".upload")
         save_path = None
         try:
             with os.fdopen(tmp_fd, "wb") as out:
