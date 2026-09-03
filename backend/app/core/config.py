@@ -83,6 +83,20 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "/app/data/uploads"
     CRAWL_DIR: str = "/app/data/crawls"
 
+    # 上传暂存目录名。流式写盘的临时文件不再与正式文件混放在 UPLOAD_DIR
+    # 根下，而是单独收进这个子目录：混放时一旦进程被 kill（OOM、强制重启），
+    # finally 来不及执行，残骸就是一堆散落在正式文件里的 .upload 文件，
+    # 既没法一眼分辨，清理时也要遍历整个 uploads 并靠扩展名猜。
+    #
+    # 独立子目录带来两个好处：清理逻辑的作用域是确定的（整个目录可删），
+    # 且正式文件目录永远干净，备份/同步时不会被临时文件污染。
+    UPLOAD_STAGING_SUBDIR: str = ".staging"
+    # 启动清理时保留的最小文件年龄（秒）。不设门槛直接清空是有风险的：
+    # gunicorn 多 worker 下每个 worker 都会单独执行启动逻辑，晚起的 worker
+    # 会看到早起 worker 正在写入的临时文件，直接删掉会让它上传失败。
+    # 设一个远大于单次上传耗时的门槛（1 小时），只回收确定已成垃圾的残留。
+    UPLOAD_STAGING_MAX_AGE_SECONDS: int = 3600
+
     # ---- Chunking defaults ----
     DEFAULT_CHUNK_STRATEGY: str = "fixed_token"
     DEFAULT_CHUNK_SIZE: int = 512
@@ -133,6 +147,10 @@ class Settings(BaseSettings):
     MILVUS_POOL_WORKERS: int = 8
     # 查询后是否释放集合。默认 False：集合加载后常驻，避免每次查询重复 load。
     MILVUS_AUTO_RELEASE: bool = False
+    # 关闭时等待在途向量读写完成的最长时间（秒）。必须小于 gunicorn 的
+    # --graceful-timeout（默认 30s），否则优雅关闭窗口会先被耗尽，进程被
+    # SIGKILL，等待逻辑形同虚设。留 10s 余量给 HTTP 连接池与 DB 关闭。
+    MILVUS_SHUTDOWN_TIMEOUT: float = 20.0
 
     # ---- Embedding 调用 ----
     EMBEDDING_BATCH_SIZE: int = 16
@@ -150,7 +168,17 @@ class Settings(BaseSettings):
     QUERY_REWRITE_CACHE_ENABLED: bool = True
     QUERY_REWRITE_CACHE_TTL: int = 3600
     QUERY_REWRITE_CACHE_MAX_SIZE: int = 2000
-    QUERY_REWRITE_TIMEOUT: float = 8.0
+    # 改写是挡在检索之前的同步等待，这里的每一秒都会原样叠加到用户感知的
+    # 首字延迟上（命中缓存时则完全不耗时）。8s 意味着一次外部 API 抖动就能
+    # 让对话开头卡住近 10 秒，而改写的收益（召回略微变好）远不值这个代价。
+    #
+    # 取 3s 的理由：正常一次改写是几百毫秒，3s 已经是很宽松的上限；超时后
+    # 链路会降级用原始 query 继续检索，功能不受影响——这是「宁可少改写，
+    # 不可让用户干等」的取舍。要更激进可以调到 2s。
+    #
+    # 注意与 HTTP_READ_TIMEOUT（60s）的分工：后者是单次 HTTP 读超时兜底，
+    # 这里是对整个改写调用的业务级预算，两者取先到者生效。
+    QUERY_REWRITE_TIMEOUT: float = 3.0
 
     # ---- SSE streaming ----
     SSE_TIMEOUT_MS: int = 120000
@@ -197,6 +225,16 @@ class Settings(BaseSettings):
     @property
     def upload_max_bytes(self) -> int:
         return self.UPLOAD_MAX_SIZE_MB * 1024 * 1024
+
+    @property
+    def upload_staging_dir(self) -> str:
+        """上传临时文件的暂存目录（UPLOAD_DIR 下的子目录，同文件系统）。
+
+        放在 UPLOAD_DIR 内部而不是独立的 /tmp，是因为落盘后要用 os.replace
+        原子改名到正式目录——跨文件系统时 os.replace 会抛 OSError，反而丢掉
+        原子性保证。
+        """
+        return os.path.join(self.UPLOAD_DIR, self.UPLOAD_STAGING_SUBDIR)
 
     @property
     def upload_allowed_extensions(self) -> list[str]:
