@@ -79,7 +79,10 @@ class Settings(BaseSettings):
 
     # ---- File Upload ----
     UPLOAD_MAX_SIZE_MB: int = 50
-    UPLOAD_ALLOWED_EXTENSIONS: str = "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls"
+    # 允许的上传扩展名。document_parser 已支持 csv 解析（documents.py 的 csv 分支），
+    # 但这里的默认值此前漏了 csv，导致「代码能解析、默认却禁止上传」——只有显式
+    # 在 .env 里补上才能用。与代码实际能力对齐。
+    UPLOAD_ALLOWED_EXTENSIONS: str = "pdf,docx,doc,pptx,ppt,txt,md,xlsx,xls,csv"
     UPLOAD_DIR: str = "/app/data/uploads"
     CRAWL_DIR: str = "/app/data/crawls"
 
