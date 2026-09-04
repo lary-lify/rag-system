@@ -45,6 +45,14 @@ backend/data/uploads/*
 backend/data/crawls/*
 !backend/data/crawls/.gitkeep
 
+# 仓库根的运行时数据目录。早期布局里 UPLOAD_DIR 指向过 data/uploads，后来在
+# backend/data 下重建，根目录这份就成了历史遗留（只剩一个骨架提交的占位文件）。
+#
+# 仍然必须忽略：find_project_root() 是以 .env 所在目录（即仓库根）定位的，
+# 任何相对路径的 UPLOAD_DIR / CRAWL_DIR 都会解析到仓库根。不忽略的话，上传
+# 进来的文件会直接进入 git 的视野，在公开仓库上等于把用户文档提交出去。
+/data/
+
 # ---------- 3. Node 前端（frontend/） ----------
 frontend/node_modules/
 frontend/dist/
