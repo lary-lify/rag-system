@@ -90,6 +90,8 @@ async def get_cost_summary(
     total_emb_tokens = 0
     total_chat_in = 0
     total_chat_out = 0
+    total_cache_hits = 0
+    total_cache_misses = 0
     by_user_map: dict[int, dict] = {}
     by_kb_map: dict[int, dict] = {}
     by_day_map: dict[str, dict] = {}
@@ -102,21 +104,28 @@ async def get_cost_summary(
             total_chat_in += r.input_tokens
             total_chat_out += r.output_tokens
             cost = _calc_chat_cost(r.input_tokens, r.output_tokens)
+            # 命中可量化对账：chat 类型按 cache_hit 累计命中/未命中次数
+            if r.cache_hit:
+                total_cache_hits += 1
+            else:
+                total_cache_misses += 1
 
         day_key = r.created_at.strftime("%Y-%m-%d")
 
         # By user
         if r.user_id not in by_user_map:
-            by_user_map[r.user_id] = {"tokens": 0, "cost": 0.0}
+            by_user_map[r.user_id] = {"tokens": 0, "cost": 0.0, "cache_hits": 0}
         by_user_map[r.user_id]["tokens"] += r.input_tokens + r.output_tokens
         by_user_map[r.user_id]["cost"] += cost
+        by_user_map[r.user_id]["cache_hits"] += 1 if r.cache_hit else 0
 
         # By KB (if applicable)
         if r.kb_id and r.kb_id is not None:
             if r.kb_id not in by_kb_map:
-                by_kb_map[r.kb_id] = {"kb_name": "", "tokens": 0, "cost": 0.0}
+                by_kb_map[r.kb_id] = {"kb_name": "", "tokens": 0, "cost": 0.0, "cache_hits": 0}
             by_kb_map[r.kb_id]["tokens"] += r.input_tokens + r.output_tokens
             by_kb_map[r.kb_id]["cost"] += cost
+            by_kb_map[r.kb_id]["cache_hits"] += 1 if r.cache_hit else 0
 
         # By day
         if day_key not in by_day_map:
@@ -151,6 +160,7 @@ async def get_cost_summary(
             "username": u.username if u else f"User#{uid}",
             "tokens": data["tokens"],
             "cost": round(data["cost"], 4),
+            "cache_hits": data["cache_hits"],
         })
 
     by_kb_list = []
@@ -161,6 +171,7 @@ async def get_cost_summary(
             "kb_name": k.name if k else f"KB#{kid}",
             "tokens": data["tokens"],
             "cost": round(data["cost"], 4),
+            "cache_hits": data["cache_hits"],
         })
 
     by_day_sorted = sorted(by_day_map.items())
@@ -173,6 +184,8 @@ async def get_cost_summary(
         total_chat_input_tokens=total_chat_in,
         total_chat_output_tokens=total_chat_out,
         total_estimated_cost=round(total_estimated, 4),
+        total_cache_hits=total_cache_hits,
+        total_cache_misses=total_cache_misses,
         by_user=by_user_list[:20],
         by_kb=by_kb_list[:20],
         by_day=by_day_list,
@@ -214,6 +227,7 @@ async def get_usage_trend(
         TokenUsage.type,
         func.sum(TokenUsage.input_tokens).label("in_toks"),
         func.sum(TokenUsage.output_tokens).label("out_toks"),
+        func.sum(case((TokenUsage.cache_hit == True, 1), else_=0)).label("cache_hits"),
     ).where(
         TokenUsage.created_at >= datetime.combine(start, datetime.min.time()),
         TokenUsage.created_at <= datetime.combine(end, datetime.max.time()),
@@ -234,7 +248,7 @@ async def get_usage_trend(
     daily_data: dict[str, dict] = {}
     for i in range(total_days + 1):
         d = (start + timedelta(days=i)).isoformat()
-        daily_data[d] = {"embedding_tokens": 0, "chat_input_tokens": 0, "chat_output_tokens": 0}
+        daily_data[d] = {"embedding_tokens": 0, "chat_input_tokens": 0, "chat_output_tokens": 0, "cache_hits": 0}
 
     for row in rows:
         dkey = str(row.dt)
@@ -244,6 +258,7 @@ async def get_usage_trend(
             else:
                 daily_data[dkey]["chat_input_tokens"] = int(row.in_toks or 0)
                 daily_data[dkey]["chat_output_tokens"] = int(row.out_toks or 0)
+                daily_data[dkey]["cache_hits"] = int(row.cache_hits or 0)
 
     dates = sorted(daily_data.keys())
     return UsageTrendResponse(
@@ -251,6 +266,7 @@ async def get_usage_trend(
         embedding_tokens=[daily_data[d]["embedding_tokens"] for d in dates],
         chat_input_tokens=[daily_data[d]["chat_input_tokens"] for d in dates],
         chat_output_tokens=[daily_data[d]["chat_output_tokens"] for d in dates],
+        cache_hits=[daily_data[d]["cache_hits"] for d in dates],
         costs=[
             round(_calc_embedding_cost(daily_data[d]["embedding_tokens"])
                   + _calc_chat_cost(daily_data[d]["chat_input_tokens"],

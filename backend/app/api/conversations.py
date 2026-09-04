@@ -335,6 +335,7 @@ async def chat_sse(
         full_answer = ""
         input_tokens = 0
         output_tokens = 0
+        cache_hit = False
         source_chunks_data = []
 
         # Create fresh db session (the endpoint's db session is closed when StreamingResponse starts)
@@ -366,6 +367,7 @@ async def chat_sse(
                     elif chunk_type == "usage":
                         input_tokens = chunk_data.get("input_tokens", 0)
                         output_tokens = chunk_data.get("output_tokens", 0)
+                        cache_hit = chunk_data.get("cache_hit", False)
 
             except Exception as e:
                 yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
@@ -407,6 +409,7 @@ async def chat_sse(
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     estimated_cost=chat_cost,
+                    cache_hit=cache_hit,
                 )
                 sse_db.add(tok_record)
                 await sse_db.commit()
@@ -415,7 +418,7 @@ async def chat_sse(
                 logger.warning(f"[billing] Failed to record token usage: {e}")
 
         # Final done signal with complete stats
-        yield f"data: {json.dumps({'type': 'done', 'message_id': msg.id, 'input_tokens': input_tokens, 'output_tokens': output_tokens, 'total_tokens': total_tokens})}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'message_id': msg.id, 'input_tokens': input_tokens, 'output_tokens': output_tokens, 'total_tokens': total_tokens, 'cache_hit': cache_hit})}\n\n"
         yield "event: done\ndata: finished\n\n"
 
     return StreamingResponse(

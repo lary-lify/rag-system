@@ -235,8 +235,10 @@ class CostSummaryResponse(BaseModel):
     total_chat_input_tokens: int
     total_chat_output_tokens: int
     total_estimated_cost: float
-    by_user: list[dict]   # [{user_id, username, tokens, cost}]
-    by_kb: list[dict]     # [{kb_id, kb_name, tokens, cost}]
+    total_cache_hits: int = 0      # chat 中命中答案缓存的次数（0 token / 0 cost served）
+    total_cache_misses: int = 0    # chat 中未命中、真实走生成链路次数
+    by_user: list[dict]   # [{user_id, username, tokens, cost, cache_hits}]
+    by_kb: list[dict]     # [{kb_id, kb_name, tokens, cost, cache_hits}]
     by_day: list[dict]    # [{date, embedding_cost, chat_cost, total_cost}]
 
 class UsageTrendResponse(BaseModel):
@@ -244,6 +246,7 @@ class UsageTrendResponse(BaseModel):
     embedding_tokens: list[int]
     chat_input_tokens: list[int]
     chat_output_tokens: list[int]
+    cache_hits: list[int] = []     # 每日 chat 命中缓存次数（看板折线）
     costs: list[float]
 
 
