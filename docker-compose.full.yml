@@ -6,16 +6,17 @@
 # ============================================
 # 架构概述
 # ============================================
-# 六容器编排：
+# 七容器编排：
 #   1. mysql       - MySQL 8.0（业务数据）
 #   2. milvus      - Milvus Standalone（向量数据）
 #   3. etcd        - Milvus 元数据存储
 #   4. minio       - Milvus 对象存储
-#   5. backend     - FastAPI 后端服务
-#   6. frontend    - Nginx + Vue3 前端（生产构建）
+#   5. redis       - 共享缓存（CACHE_BACKEND=redis 时启用，可选）
+#   6. backend     - FastAPI 后端服务
+#   7. frontend    - Nginx + Vue3 前端（生产构建）
 #
 # 网络：rag-network (bridge)
-# 数据卷：mysql_data, milvus_data, etcd_data, minio_data, upload_data, crawl_data
+# 数据卷：mysql_data, milvus_data, etcd_data, minio_data, upload_data, crawl_data, redis_data
 # ============================================
 
 services:
@@ -122,6 +123,24 @@ services:
     command: minio server /minio_data --console-address ":9001"
 
   # ============================================
+  # 2.5 Redis 共享缓存（CACHE_BACKEND=redis 时启用）
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ============================================
   # 3. FastAPI 后端服务
   # ============================================
   backend:
@@ -139,6 +158,10 @@ services:
       # 也用于推算数据库连接池总占用，避免打穿 MySQL max_connections
       APP_WORKERS: ${APP_WORKERS:-2}
       APP_GRACEFUL_TIMEOUT: ${APP_GRACEFUL_TIMEOUT:-30}
+      # 共享缓存：启用 Redis 后多副本/多 worker 共用一份缓存、重启不丢；
+      # 连不上 Redis 时后端会自动降级进程内缓存并告警，不影响启动。
+      CACHE_BACKEND: ${CACHE_BACKEND:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - upload_data:/app/data/uploads
       - crawl_data:/app/data/crawls
@@ -148,6 +171,8 @@ services:
       mysql:
         condition: service_healthy
       milvus:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -189,6 +214,8 @@ volumes:
     name: rag_upload_data
   crawl_data:
     name: rag_crawl_data
+  redis_data:
+    name: rag_redis_data
 
 # ============================================
 # 网络定义

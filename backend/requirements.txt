@@ -54,3 +54,4 @@ schedule>=1.2.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 httpx>=0.27.0
+fakeredis>=2.20.0  # Redis 缓存后端单测（模拟 Redis 协议，无需真实服务）
