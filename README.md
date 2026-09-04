@@ -167,6 +167,8 @@ pip install -r requirements.txt
 cp ../.env.example .env   # 填写配置
 # 注意：UPLOAD_DIR 默认值为 /app/data/uploads（容器路径）。本地开发若不覆盖，
 # 上传文件会写到该绝对路径；如需落地到项目内，请在 .env 设置 UPLOAD_DIR=./data/uploads
+# 缓存默认 CACHE_BACKEND=redis（共享缓存）。本地未启动 Redis 时会在启动日志告警并自动降级为
+# 进程内 memory 缓存（不崩）；若想消除该告警，在 .env 设 CACHE_BACKEND=memory 即可。
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 前端（新终端）
@@ -190,7 +192,7 @@ npm run dev
 | `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` | MySQL 连接 |
 | `MILVUS_HOST` / `MILVUS_PORT` | Milvus 连接 |
 | `REDIS_URL` | Redis 连接串（`CACHE_BACKEND=redis` 时作为共享缓存后端） |
-| `CACHE_BACKEND` | 缓存后端：`memory`（默认，进程内）或 `redis`（共享，多副本一致） |
+| `CACHE_BACKEND` | 缓存后端，`redis` 为默认（共享、多副本一致、重启不丢，需自备 Redis）；`memory` 为进程内（本地无 Redis 时自动降级，多 worker 不共享） |
 | `DAILY_SUMMARY_ENABLED` | 日报内置调度器开关（默认 `true`）；置 `false` 时改用外部 cron 调 `POST /api/reports/trigger-summary` |
 | `DAILY_SUMMARY_HOUR` | 日报每日触发小时（本地时间 0-23，默认 `2`，汇总前一天） |
 | `JWT_SECRET_KEY` | JWT 签名密钥（生产必须修改） |
