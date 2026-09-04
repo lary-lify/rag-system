@@ -194,7 +194,7 @@ npm run dev
 | `REDIS_URL` | Redis 连接串（`CACHE_BACKEND=redis` 时作为共享缓存后端） |
 | `CACHE_BACKEND` | 缓存后端，`redis` 为默认（共享、多副本一致、重启不丢，需自备 Redis）；`memory` 为进程内（本地无 Redis 时自动降级，多 worker 不共享） |
 | `CACHE_ANSWER_ENABLED` | 答案级缓存开关（默认 `true`）。命中后跳过查询改写+向量检索+LLM 生成，直接流式返回整段答案，SSE 带 `cache_hit` 标记、计费记 0 |
-| `CACHE_ANSWER_TTL` | 答案缓存 TTL（秒，默认 `3600`）；也是答案陈旧上界，KB 内容更新后旧答案最多存活这么久 |
+| `CACHE_ANSWER_TTL` | 答案缓存 TTL（秒，默认 `3600`）；也是答案陈旧上界。此外已接「文档级即时失效」：每个 KB 有世代计数器，文档上传完成（向量进 Milvus）或删除时自增，答案缓存 scope 把 epoch 编入，旧 KB 的答案立即查不到、新查询走新 scope，把 TTL 窗口内的陈旧风险压到 0 |
 | `ANSWER_SEMANTIC_THRESHOLD` | 语义命中余弦阈值（默认 `0.92`）；查询向量与近期 query 向量池最近一条余弦 >= 该值即命中，捕捉同义改写 |
 | `ANSWER_SEMANTIC_POOL_MAX` | 每个 scope 的语义向量池上限（条，默认 `64`），超过按 FIFO 淘汰 |
 | `ANSWER_CACHE_MAX_SIZE` | 答案缓存精确命中键容量上限（默认 `2000`，TTL+容量双约束） |
