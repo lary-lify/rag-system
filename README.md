@@ -13,13 +13,16 @@
 
 ### 文档与知识库管理
 - **知识库 CRUD**：创建、编辑、删除、列表、权限配置
-- **文档上传**：支持常见文档格式上传，存储于 `data/uploads/`
+- **文档上传**：支持 `pdf` / `docx` / `doc` / `pptx` / `ppt` / `txt` / `md` / `xlsx` / `xls` / `csv` 格式上传，存储于 `data/uploads/`
 - **文档解析**：自动提取文本内容并生成文档记录
-- **四种切片策略**：
+- **七种切片策略**：
   - 固定 Token（fixed_token）
   - 语义切片（semantic）
   - 段落切片（paragraph）
   - 标题层级切片（heading_level）
+  - 问答对切片（qa_pair）
+  - 递归切片（recursive）
+  - AI 辅助切片（ai_assisted）
 - **切片管理**：查看、删除、重新生成切片
 
 ### 检索与对话
@@ -31,11 +34,11 @@
 
 ### 计费与报表
 - **Token 用量记录**：按用户/会话/模型多维度记录 `input` / `output` / `total`
-- **日报汇总**：`daily_summary` 自动汇总每日用量
+- **用量汇总**：由 `app/services/daily_summary.py` 写入三张按日汇总表 `daily_token_summary`（Token/费用/请求数）、`daily_qa_summary`（问答统计）、`daily_hot_questions`（热门问题）。**无内置调度器**，需超管调用 `POST /api/reports/trigger-summary` 手动触发（或外部 cron 定时调用）
 - **报表与导出**：对话记录导出 Excel，含 Token 明细
 
 ### 系统管理
-- **系统配置**：嵌入模型、LLM、限额等运行时参数在线调整
+- **系统配置（只读）**：通过 `GET /api/config` 查看嵌入模型、LLM、限额等运行时参数与 `GET /api/config/cache-stats` 查看缓存命中率（部门管理员及以上）；参数调整需修改环境变量后重启，不支持运行时在线改写
 - **用户管理**：用户增删改查、角色分配
 - **看板/仪表盘**：数据概览与可视化（ECharts）
 - **限流与日志**：请求限流、结构化日志按天轮转
@@ -45,10 +48,10 @@
 | 层 | 技术 |
 |---|---|
 | 前端 | Vue 3 + Vite + Ant Design Vue + ECharts |
-| 后端 | Python 3 + FastAPI + SQLAlchemy + Pydantic |
+| 后端 | Python 3.11+ + FastAPI + SQLAlchemy + Pydantic |
 | 向量库 | Milvus Standalone |
 | 关系库 | MySQL 8.0 |
-| 缓存 | Redis |
+| 缓存 | Redis（共享缓存后端，按 `CACHE_BACKEND` 在 `memory` / `redis` 间切换；`CACHE_BACKEND=memory` 时为进程内缓存，多 worker 不共享） |
 | 嵌入模型 | 阿里通义 `text-embedding-v3` |
 | 对话 LLM | DeepSeek (`deepseek-chat`) |
 | 部署 | Docker + Docker Compose |
@@ -94,6 +97,7 @@ rag-kb-system/
 │   │   └── main.py           # 应用入口
 │   ├── tests/                # 测试用例
 │   ├── data/                 # 运行时数据（已忽略，保留 .gitkeep）
+│   ├── outputs/              # 运行时产物（导出/图表等，已忽略）
 │   ├── logs/                 # 运行日志（已忽略）
 │   └── requirements.txt      # Python 依赖
 ├── frontend/                 # Vue 3 前端
@@ -104,12 +108,15 @@ rag-kb-system/
 │       ├── router/           # 路由配置
 │       └── stores/           # Pinia 状态管理
 ├── sql/                      # 数据库初始化与迁移脚本
-├── scripts/                  # 运维脚本
+├── scripts/                  # 运维脚本（run_*.sh/bat 等）
 ├── docs/                     # 设计文档
-├── docker-compose.yml        # 最小部署（MySQL + Milvus + 后端 + 前端）
-├── docker-compose.full.yml   # 完整生产部署
-├── .env.example              # 环境变量模板
+├── samples/                  # 示例文档与素材
+├── design-prototype/         # 前端设计原型
+├── docker-compose.yml        # 最小部署（仅 rag-backend 单服务，便于本地快速起后端）
+├── docker-compose.full.yml   # 完整生产部署（MySQL + Milvus + etcd + MinIO + Redis + 后端 + 前端）
+├── .env.example              # 环境变量模板（脚本生成，与 config.py 默认对齐）
 ├── .env.template             # 环境变量模板（备用）
+├── .env.docker               # Docker 部署用环境变量（已忽略，不入库）
 └── README.md                 # 本文件
 ```
 
@@ -125,7 +132,9 @@ rag-kb-system/
 | `conversations` | 对话会话表 |
 | `messages` | 对话消息表 |
 | `token_usage` | Token 用量明细表 |
-| `daily_summary` | 每日用量汇总表 |
+| `daily_token_summary` | 每日 Token / 费用 / 请求数汇总表（raw SQL 建表，手动触发写入） |
+| `daily_qa_summary` | 每日问答统计数据表 |
+| `daily_hot_questions` | 每日热门问题表 |
 | `audit_logs` | 审计日志表 |
 | `login_logs` | 登录日志表 |
 
@@ -156,12 +165,14 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp ../.env.example .env   # 填写配置
+# 注意：UPLOAD_DIR 默认值为 /app/data/uploads（容器路径）。本地开发若不覆盖，
+# 上传文件会写到该绝对路径；如需落地到项目内，请在 .env 设置 UPLOAD_DIR=./data/uploads
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 前端（新终端）
 cd frontend
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 ## 配置说明
@@ -178,9 +189,10 @@ pnpm dev
 | `DEEPSEEK_API_KEY` | DeepSeek 对话模型 API Key |
 | `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` | MySQL 连接 |
 | `MILVUS_HOST` / `MILVUS_PORT` | Milvus 连接 |
-| `REDIS_HOST` / `REDIS_PORT` | Redis 连接 |
+| `REDIS_URL` | Redis 连接串（`CACHE_BACKEND=redis` 时作为共享缓存后端） |
+| `CACHE_BACKEND` | 缓存后端：`memory`（默认，进程内）或 `redis`（共享，多副本一致） |
 | `JWT_SECRET_KEY` | JWT 签名密钥（生产必须修改） |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 初始超管账号（生产必须修改） |
+| `INIT_ADMIN_USERNAME` / `INIT_ADMIN_PASSWORD` | 初始超管账号（生产必须修改；密码为空时不创建） |
 
 ## 测试
 

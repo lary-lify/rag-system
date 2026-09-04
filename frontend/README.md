@@ -6,11 +6,11 @@
 |------|------|------|
 | 框架 | Vue 3 + Composition API | 3.5 |
 | 构建 | Vite | 8.1 |
-| UI | Ant Design Vue | 最新稳定版 |
+| UI | Ant Design Vue | ^4.2.6 |
 | 路由 | Vue Router 4 | 4.x |
 | 状态管理 | Pinia | 3.x |
-| 图表 | ECharts | 5.x |
-| 导出 | xlsx + file-saver | latest |
+| 图表 | ECharts | ^6.1.0 |
+| 导出 | xlsx + file-saver | ^0.18.5 |
 | 日期 | dayjs | 1.x |
 
 ## 快速启动
