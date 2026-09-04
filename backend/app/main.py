@@ -144,6 +144,11 @@ async def lifespan(app: FastAPI):
     from init_data import create_super_admin
     await create_super_admin()
 
+    # 启动日报定时汇总调度器（幂等，多 worker 重复触发无害；停机错过触发点时启动补跑昨天）
+    from app.core.scheduler import start_scheduler
+
+    await start_scheduler()
+
     logger.info(f"{settings.APP_NAME} started on port {settings.APP_PORT}")
     yield
     # 关闭外部连接（HTTP 连接池 / Milvus / Redis 缓存客户端）
@@ -161,6 +166,14 @@ async def lifespan(app: FastAPI):
         shutdown_pool()
     except Exception as e:
         logger.warning(f"Milvus pool shutdown skipped: {e}")
+
+    # 停止日报调度器（取消后台任务）
+    try:
+        from app.core.scheduler import stop_scheduler
+
+        await stop_scheduler()
+    except Exception as e:
+        logger.warning(f"Scheduler stop skipped: {e}")
     get_milvus_connection().disconnect()
     await close_db()
     logger.info(f"{settings.APP_NAME} stopped.")

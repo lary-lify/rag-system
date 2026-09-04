@@ -83,6 +83,14 @@ class Settings(BaseSettings):
     # 连不上 Redis 时自动降级 memory 并告警，不阻塞启动。
     CACHE_BACKEND: Literal["memory", "redis"] = "memory"  # type: ignore[assignment]
 
+    # ---- 日报定时汇总（内置调度器，可选）----
+    # 是否启用内置调度器每日触发 daily_summary 三张表汇总。
+    # 关闭后也可由外部 cron 定时调 POST /api/reports/trigger-summary 达到同样效果。
+    DAILY_SUMMARY_ENABLED: bool = True
+    # 每日触发小时（本地时间 0-23），汇总前一天数据。汇总写入为 ON DUPLICATE KEY UPDATE，
+    # 多 worker 重复触发幂等无害，无需分布式锁；服务停机错过触发点时，启动会补跑昨天。
+    DAILY_SUMMARY_HOUR: int = 2
+
     # ---- File Upload ----
     UPLOAD_MAX_SIZE_MB: int = 50
     # 允许的上传扩展名。document_parser 已支持 csv 解析（documents.py 的 csv 分支），
