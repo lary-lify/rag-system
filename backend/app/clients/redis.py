@@ -1,8 +1,11 @@
 """
 Redis 客户端单例（async）。
 
-属于 clients 层的一部分，主请求链路尚未使用；配置好 REDIS_URL 并安装
-`redis` 后，即可用于限流 / 缓存 / 会话等场景（与脚手架 Base/Client/redisClient.py 对齐）。
+属于 clients 层的一部分。说明：
+- 缓存（查询向量 / 查询改写）已通过 `app.core.cache` 接入，使用**同步** redis 客户端
+  （与 TTLCache 同接口、调用方零改动），由 `CACHE_BACKEND=redis` 开启。
+- 本文件的 async 客户端保留给未来需要异步语义的场景（限流 / 会话等）。
+两者共用同一个 REDIS_URL，按需取用即可。
 """
 from __future__ import annotations
 

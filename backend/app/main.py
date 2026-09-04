@@ -128,8 +128,8 @@ async def lifespan(app: FastAPI):
     # 兄弟 worker 的在途上传）
     _cleanup_upload_staging()
 
-    # 按配置刷新缓存容量与 TTL（缓存实例在导入时用的是代码内默认值）
-    configure_caches()
+    # 按配置刷新缓存容量与 TTL，并按 CACHE_BACKEND 选择后端（异步：启动期探测 Redis）
+    await configure_caches()
     _log_capacity_budget()
 
     await init_db()
@@ -146,8 +146,14 @@ async def lifespan(app: FastAPI):
 
     logger.info(f"{settings.APP_NAME} started on port {settings.APP_PORT}")
     yield
-    # 关闭外部连接（HTTP 连接池 / Milvus）
+    # 关闭外部连接（HTTP 连接池 / Milvus / Redis 缓存客户端）
     await close_http_clients()
+    try:
+        from app.core.cache import close_redis
+
+        close_redis()
+    except Exception as e:
+        logger.warning(f"Redis client close skipped: {e}")
     # 释放常驻集合句柄与线程池，再断开连接，避免关闭时出现半释放状态
     try:
         from app.services.milvus_service import shutdown_pool

@@ -287,7 +287,8 @@ class CacheStatsItem(BaseModel):
     expirations: int  # 因 TTL 到期失效
     hit_rate: float  # 0~1
     # 容量被打满时淘汰会加速，命中率下滑的第一个信号看这里
-    utilization: float  # size / max_size，0~1
+    # Redis 后端为集中式缓存，本进程无法估算水位，上报 None（由 Redis 服务端 maxmemory 策略管）
+    utilization: Optional[float] = None  # size / max_size，0~1；Redis 模式为 None
     # 多 worker 部署时本进程只看到全局流量的一部分，读数需按 worker 数折算
     worker_count: int
 

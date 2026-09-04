@@ -74,8 +74,14 @@ class Settings(BaseSettings):
     DEEPSEEK_OUTPUT_TOKEN_PRICE: float = 0.0020
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
 
-    # ---- Redis (optional, for future rate-limit/cache) ----
+    # ---- Redis (optional, for cache / future rate-limit) ----
+    # Redis 连接串。CACHE_BACKEND=redis 时作为共享缓存后端；主请求链路缓存
+    # 通过 app.core.cache 的同步客户端接入（与 TTLCache 同接口，调用方零改动）。
     REDIS_URL: str = "redis://localhost:6379/0"
+    # 缓存后端：memory=进程内（默认，单机/少 worker 零依赖）；
+    # redis=共享缓存（多副本共享、重启不丢，需自备 Redis 服务，compose.full 已含）。
+    # 连不上 Redis 时自动降级 memory 并告警，不阻塞启动。
+    CACHE_BACKEND: Literal["memory", "redis"] = "memory"  # type: ignore[assignment]
 
     # ---- File Upload ----
     UPLOAD_MAX_SIZE_MB: int = 50

@@ -101,6 +101,9 @@ async def get_cache_stats(
         process_note=(
             "读数为当前进程视角；多 worker 部署时每个 worker 一份缓存与一份统计，"
             "单进程读数只是全局流量的 1/N 采样，需逐 worker 采集后汇总。"
+            "Redis 后端（CACHE_BACKEND=redis）下缓存集中存储、跨 worker 共享，"
+            "但统计仍各进程独立累加；utilization 在 Redis 模式下为 null，"
+            "水位需查 Redis INFO memory / maxmemory 策略。"
         ),
     )
 
