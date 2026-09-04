@@ -19,6 +19,7 @@ from app.services.answer_cache import build_answer_scope, lookup_answer, resolve
 from app.services.embedding_service import embed_single_text, estimate_token_count
 from app.services.milvus_service import search_vectors
 from app.services.query_rewrite import rewrite_query
+from app.services.rerank_service import rerank_results
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,20 @@ async def stream_chat_response(
 
     if kb_ids:
         source_chunks_data = await _retrieve_from_kbs(kb_ids, search_query, db)
+        # 检索后重排（Reranker）：把最可能回答问题的片段顶到 prompt 前部，
+        # 缓解 Q4.12 上下文污染 / lost-in-the-middle。默认启发式 cross_encoder
+        # （0 LLM 调用）；RERANKER_USE_LLM=True 升级为 DeepSeek 打分。
+        # 异常兜底：重排失败保留检索原序，不拖垮主链路。
+        if settings.RERANKER_ENABLED and source_chunks_data:
+            try:
+                source_chunks_data = await rerank_results(
+                    query=search_query,
+                    documents=source_chunks_data,
+                    top_k=len(source_chunks_data),
+                    use_llm=settings.RERANKER_USE_LLM,
+                )
+            except Exception as e:
+                logger.warning(f"[llm] rerank failed, keep retrieval order: {e}")
         context_parts = [
             f"[Source (score={c['score']})]: {c['content']}"
             for c in source_chunks_data

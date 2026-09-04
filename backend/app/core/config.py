@@ -149,6 +149,18 @@ class Settings(BaseSettings):
     RAG_SCORE_THRESHOLD: float = 0.3
     RAG_RETRIEVE_MODE: Literal["vector", "keyword", "mix"] = "mix"  # type: ignore[assignment]
 
+    # ---- Reranker（检索后重排）----
+    # 检索召回的候选片段按相关度排序并不完美，向量召回会把"语义相近但事实无关"
+    # 的片段排前（Q4.12 上下文污染 / lost-in-the-middle）。Reranker 在检索后对候选
+    # 二次重排，把最可能回答问题的片段顶到 prompt 前部。
+    # RERANKER_ENABLED: 主链路是否启用重排（默认开）。
+    # RERANKER_USE_LLM: True 走 DeepSeek 打分重排（多 1 次 LLM 调用、有延迟/成本，
+    #   失败自动回退原序）；False 走启发式 cross_encoder（term overlap + 位置 + 长度，
+    #   **0 LLM 调用**，默认，先低成本上线）。候选超过 20 条时只取前 20 参与重排
+    #   （rerank_service 内部固定上限，避免 LLM 模式 token 超限）。
+    RERANKER_ENABLED: bool = True
+    RERANKER_USE_LLM: bool = False
+
     # ---- Deployment / 进程模型 ----
     # gunicorn worker 数。连接池容量按 worker 数推算，多副本部署时必须与实际一致，
     # 否则会放大 MySQL 连接数（worker 数 x 单 worker 池上限）。
