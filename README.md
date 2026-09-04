@@ -28,6 +28,7 @@
 ### 检索与对话
 - **向量检索**：基于 Milvus + 阿里通义 `text-embedding-v3`
 - **混合召回**：向量相似度 + 关键词匹配（hybrid_search）
+- **检索后重排（Reranker）**：召回候选经二次重排把最相关片段顶到 prompt 前部，缓解上下文污染 / lost-in-the-middle。默认启发式 `cross_encoder`（term overlap + 位置 + 长度，**0 LLM 调用**）；`RERANKER_USE_LLM=true` 升级为 DeepSeek 打分重排（多 1 次 LLM 调用，失败自动回退原序）。`RERANKER_ENABLED=false` 可整体关闭
 - **SSE 流式对话**：前端 EventSource 实时渲染，支持停止生成
 - **多轮对话**：会话（conversation）与消息（message）持久化
 - **引用溯源**：返回召回 chunk 来源，便于核对答案依据
@@ -199,6 +200,8 @@ npm run dev
 | `ANSWER_SEMANTIC_THRESHOLD` | 语义命中余弦阈值（默认 `0.92`）；查询向量与近期 query 向量池最近一条余弦 >= 该值即命中，捕捉同义改写 |
 | `ANSWER_SEMANTIC_POOL_MAX` | 每个 scope 的语义向量池上限（条，默认 `64`），超过按 FIFO 淘汰 |
 | `ANSWER_CACHE_MAX_SIZE` | 答案缓存精确命中键容量上限（默认 `2000`，TTL+容量双约束） |
+| `RERANKER_ENABLED` | 检索后重排开关（默认 `true`）。关掉则命中直接走检索原序，不重排 |
+| `RERANKER_USE_LLM` | 重排方式（默认 `false`）。`false`=启发式 `cross_encoder`（term overlap+位置+长度，**0 LLM 调用**，先低成本上线）；`true`=DeepSeek 打分重排（多 1 次 LLM 调用、有延迟/成本，失败自动回退原序）。注意：启发式按空格分词，对**中文**整句 query 的 term-overlap 基本为 0，中文场景要真重排需设 `true` |
 | `DAILY_SUMMARY_ENABLED` | 日报内置调度器开关（默认 `true`）；置 `false` 时改用外部 cron 调 `POST /api/reports/trigger-summary` |
 | `DAILY_SUMMARY_HOUR` | 日报每日触发小时（本地时间 0-23，默认 `2`，汇总前一天） |
 | `JWT_SECRET_KEY` | JWT 签名密钥（生产必须修改） |
