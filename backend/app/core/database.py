@@ -132,6 +132,24 @@ async def init_db() -> None:
         except Exception:
             pass
 
+    # Migration: add token_usage.cache_hit column for cache-hit reconciliation.
+    # 答案级缓存命中标记：True=本次 chat 计费来自缓存(0 token/0 cost)。首次运行新增列，
+    # 已存在的表会因 Duplicate column 抛错被吞掉（幂等）；用 information_schema 预判避免噪音日志。
+    async with engine.begin() as conn:
+        try:
+            col = await conn.exec_driver_sql(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() "
+                "AND table_name = 'token_usage' AND column_name = 'cache_hit'"
+            )
+            if not col.fetchone():
+                await conn.exec_driver_sql(
+                    "ALTER TABLE token_usage ADD COLUMN cache_hit TINYINT(1) NOT NULL DEFAULT 0"
+                )
+                logger.info("token_usage.cache_hit column added (cache-hit reconciliation).")
+        except Exception:
+            pass
+
     logger.info("Database tables created/verified.")
 
 

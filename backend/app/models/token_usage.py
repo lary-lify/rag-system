@@ -53,6 +53,11 @@ class TokenUsage(Base):
     estimated_cost: Mapped[float] = mapped_column(
         sa.Numeric(12, 6), default=0.000000
     )
+    # 答案级缓存命中标记：True 表示该次 chat 计费来自缓存（跳过改写+检索+LLM，token/cost 记 0）。
+    # 用于「命中可量化对账」——按 KB/时间/用户统计有多少次对话以 0 LLM 成本 served。
+    cache_hit: Mapped[bool] = mapped_column(
+        sa.Boolean, default=False, nullable=False, server_default=sa.false()
+    )
 
     created_at: Mapped[sa.DateTime] = mapped_column(
         sa.DateTime, server_default=sa.func.now()
