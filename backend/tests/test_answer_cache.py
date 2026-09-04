@@ -22,8 +22,11 @@ from app.core.config import settings
 from app.services import answer_cache as ac_mod
 from app.services.answer_cache import (
     build_answer_scope,
+    bump_kb_epoch,
+    get_kb_epoch,
     lookup_answer,
     normalize_query,
+    resolve_scope,
     store_answer,
 )
 
@@ -171,3 +174,50 @@ def _exact_full(scope_key: str, norm_q: str) -> str:
     from app.core.cache import make_cache_key
 
     return make_cache_key("answer", "exact", scope_key, norm_q)
+
+
+@pytest.mark.asyncio
+async def test_epoch_bump_invalidates_old_scope(redis_backend, fake_embed, monkeypatch):
+    """文档上传完成/删除后自增 epoch，旧 scope 的答案立即查不到，新查询走新 scope。"""
+    monkeypatch.setattr(settings, "CACHE_ANSWER_ENABLED", True)
+    kb_ids = [1]
+    scope0 = await resolve_scope(kb_ids)
+    assert scope0 == "kb:1@0"
+    r = await lookup_answer(scope0, "怎么退款")
+    await store_answer(scope0, r.norm_q, "退款流程", query_vec=r.query_vec)
+    assert (await lookup_answer(scope0, "怎么退款")).answer == "退款流程"
+    # 文档变更：自增 epoch
+    new_epoch = await bump_kb_epoch(1)
+    assert new_epoch == 1
+    # 新 scope 查不到旧答案（旧 scope kb:1@0 不再被使用）
+    scope1 = await resolve_scope(kb_ids)
+    assert scope1 == "kb:1@1"
+    assert (await lookup_answer(scope1, "怎么退款")).answer is None
+
+
+@pytest.mark.asyncio
+async def test_epoch_shared_via_redis(redis_backend, monkeypatch):
+    """多 worker 共享同一 Redis：一个进程 bump，另一个进程 get 到新 epoch。"""
+    monkeypatch.setattr(settings, "CACHE_ANSWER_ENABLED", True)
+    assert await bump_kb_epoch(7) == 1
+    assert await get_kb_epoch(7) == 1
+    # 直接经后端确认可见（INCR 存的是原始整数，get 经 json.loads 仍得 int）
+    assert answer_cache.get("epoch:7") == 1
+
+
+@pytest.mark.asyncio
+async def test_epoch_only_affects_changed_kb(redis_backend, fake_embed, monkeypatch):
+    """只变更其中一个 KB 时，仅含该 KB 的 scope 失效，其他组合不受影响。"""
+    monkeypatch.setattr(settings, "CACHE_ANSWER_ENABLED", True)
+    s12 = await resolve_scope([1, 2])
+    r12 = await lookup_answer(s12, "共同问题")
+    await store_answer(s12, r12.norm_q, "AB答案", query_vec=r12.query_vec)
+    s1 = await resolve_scope([1])
+    r1 = await lookup_answer(s1, "单库问题")
+    await store_answer(s1, r1.norm_q, "A答案", query_vec=r1.query_vec)
+    # 仅变更 KB 2
+    await bump_kb_epoch(2)
+    # 含 KB2 的组合 scope 变了 -> 失效
+    assert (await lookup_answer(await resolve_scope([1, 2]), "共同问题")).answer is None
+    # 仅含 KB1 的组合未变 -> 仍命中
+    assert (await lookup_answer(await resolve_scope([1]), "单库问题")).answer == "A答案"
