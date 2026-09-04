@@ -11,6 +11,7 @@ from typing import AsyncIterator
 import httpx
 from app.clients.http_client import http_client_context
 
+from app.core.cache import query_rewrite_cache, make_cache_key
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,26 @@ REWRITE_PROMPT = """你是一个查询改写专家。你的任务是将用户的
 
 
 async def rewrite_query(
+    query: str,
+    conversation_history: list[dict] | None = None,
+) -> dict:
+    """查询改写入口：命中缓存直接返回，未命中才调用 LLM（见 _rewrite_core）。
+
+    缓存 key 仅取原始 query（不混入多轮 history）——改写主结果是去型号 / 泛化，
+    与历史弱相关；把 history 计入 key 会让同一 query 在不同对话里几乎永不命中，
+    反而失去缓存意义。
+    """
+    cache_on = bool(settings.QUERY_REWRITE_CACHE_ENABLED)
+    if cache_on:
+
+        async def _factory() -> dict:
+            return await _rewrite_core(query, conversation_history)
+
+        return await query_rewrite_cache.get_or_compute(make_cache_key(query), _factory)
+    return await _rewrite_core(query, conversation_history)
+
+
+async def _rewrite_core(
     query: str,
     conversation_history: list[dict] | None = None,
 ) -> dict:
@@ -104,12 +125,14 @@ async def rewrite_query(
 
     except Exception as e:
         logger.warning(f"Query rewrite failed: {e}")
-        # Fallback: return original query
+        # Fallback: return original query. _error=True 供调用方判断是否写入缓存
+        # （失败降级结果不应缓存，否则一次抖动会被缓存住、长时间内都不再重试）。
         return {
             "rewritten_query": query,
             "query_variants": [],
             "analysis": "查询改写失败，使用原始查询",
             "original_query": query,
+            "_error": True,
         }
 
 
