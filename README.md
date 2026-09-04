@@ -34,7 +34,7 @@
 
 ### 计费与报表
 - **Token 用量记录**：按用户/会话/模型多维度记录 `input` / `output` / `total`
-- **用量汇总**：由 `app/services/daily_summary.py` 写入三张按日汇总表 `daily_token_summary`（Token/费用/请求数）、`daily_qa_summary`（问答统计）、`daily_hot_questions`（热门问题）。**无内置调度器**，需超管调用 `POST /api/reports/trigger-summary` 手动触发（或外部 cron 定时调用）
+- **用量汇总**：由 `app/services/daily_summary.py` 写入三张按日汇总表 `daily_token_summary`（Token/费用/请求数）、`daily_qa_summary`（问答统计）、`daily_hot_questions`（热门问题）。内置调度器默认启用（`DAILY_SUMMARY_ENABLED=true`），每日本地时间 `DAILY_SUMMARY_HOUR`（默认 2 点）汇总前一天；写入为 `ON DUPLICATE KEY UPDATE` 幂等，多 worker 重复触发无害。也可关闭内置调度器、由超管调用 `POST /api/reports/trigger-summary` 或外部 cron 手动触发
 - **报表与导出**：对话记录导出 Excel，含 Token 明细
 
 ### 系统管理
@@ -191,6 +191,8 @@ npm run dev
 | `MILVUS_HOST` / `MILVUS_PORT` | Milvus 连接 |
 | `REDIS_URL` | Redis 连接串（`CACHE_BACKEND=redis` 时作为共享缓存后端） |
 | `CACHE_BACKEND` | 缓存后端：`memory`（默认，进程内）或 `redis`（共享，多副本一致） |
+| `DAILY_SUMMARY_ENABLED` | 日报内置调度器开关（默认 `true`）；置 `false` 时改用外部 cron 调 `POST /api/reports/trigger-summary` |
+| `DAILY_SUMMARY_HOUR` | 日报每日触发小时（本地时间 0-23，默认 `2`，汇总前一天） |
 | `JWT_SECRET_KEY` | JWT 签名密钥（生产必须修改） |
 | `INIT_ADMIN_USERNAME` / `INIT_ADMIN_PASSWORD` | 初始超管账号（生产必须修改；密码为空时不创建） |
 
