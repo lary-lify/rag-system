@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # 缓存后端：memory=进程内（默认，单机/少 worker 零依赖）；
     # redis=共享缓存（多副本共享、重启不丢，需自备 Redis 服务，compose.full 已含）。
     # 连不上 Redis 时自动降级 memory 并告警，不阻塞启动。
-    CACHE_BACKEND: Literal["memory", "redis"] = "memory"  # type: ignore[assignment]
+    CACHE_BACKEND: Literal["memory", "redis"] = "redis"  # type: ignore[assignment]
 
     # ---- 日报定时汇总（内置调度器，可选）----
     # 是否启用内置调度器每日触发 daily_summary 三张表汇总。
