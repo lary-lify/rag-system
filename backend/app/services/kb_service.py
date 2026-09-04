@@ -74,6 +74,8 @@ async def process_document_async(document_id: int, user_id: int) -> None:
             logger.warning(f"[pipeline] Document {document_id} not found or deleted")
             return
 
+        kb_id = doc.kb_id  # 捕获为局部变量，避免后续 commit 后访问过期 ORM 属性
+
         # Load knowledge base config for embedding model
         from app.models.knowledge_base import KnowledgeBase
         kb_result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == doc.kb_id))
@@ -252,6 +254,17 @@ async def process_document_async(document_id: int, user_id: int) -> None:
                     f"{len(db_chunk_ids)} chunk(s) have no vector, needs re-index"
                 )
             await db.commit()
+
+            # 知识库内容已变更（新片段进入向量库，检索结果会变）→ 使该 KB 的答案缓存失效。
+            # 通过自增 KB 世代计数器：旧 scope（含旧 epoch）的答案立即查不到，新查询走新 scope。
+            if milvus_ok:
+                from app.services.answer_cache import bump_kb_epoch
+
+                try:
+                    new_epoch = await bump_kb_epoch(kb_id)
+                    logger.info(f"[pipeline] bumped answer-cache epoch for kb {kb_id} -> {new_epoch}")
+                except Exception as e:
+                    logger.warning(f"[pipeline] bump_kb_epoch failed (kb={kb_id}): {e}")
 
             # Update KB cache counters
             from app.models.knowledge_base import KnowledgeBase

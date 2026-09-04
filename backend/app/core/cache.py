@@ -113,6 +113,17 @@ class TTLCache:
     def invalidate(self, key: str) -> None:
         self._data.pop(key, None)
 
+    def incr(self, key: str, amount: int = 1) -> int:
+        """原子自增，用于 KB 世代计数器等跨进程共享计数。
+
+        进程内为读改写，非严格并发安全；但 epoch 即便在极低概率下丢一次自增，
+        最多退化为「某次文档变更未使缓存失效」，仍有 TTL 兜底，不影响正确性。
+        """
+        cur = self.get(key)
+        val = (int(cur) if isinstance(cur, (int, float)) else 0) + amount
+        self.set(key, val)
+        return val
+
     def clear(self) -> None:
         self._data.clear()
 
@@ -283,6 +294,14 @@ class RedisCache:
         except Exception:
             pass
 
+    def incr(self, key: str, amount: int = 1) -> int:
+        """原子自增（Redis INCR），用于 KB 世代计数器等跨进程共享计数。"""
+        try:
+            return int(self._redis.incr(self._full_key(key), amount))
+        except Exception as e:
+            logger.warning(f"[cache:{self.name}] redis incr failed: {e}")
+            return 0
+
     def clear(self) -> None:
         try:
             keys = self._redis.keys(f"rag:cache:{self.name}:*")
@@ -360,6 +379,9 @@ class Cache:
 
     def invalidate(self, key: str) -> None:
         self._active.invalidate(key)
+
+    def incr(self, key: str, amount: int = 1) -> int:
+        return self._active.incr(key, amount)
 
     def clear(self) -> None:
         self._active.clear()

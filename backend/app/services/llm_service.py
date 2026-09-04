@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.clients.http_client import http_client_context
 from app.core.cache import make_cache_key, query_rewrite_cache
 from app.core.config import settings
-from app.services.answer_cache import build_answer_scope, lookup_answer, store_answer
+from app.services.answer_cache import build_answer_scope, lookup_answer, resolve_scope, store_answer
 from app.services.embedding_service import embed_single_text, estimate_token_count
 from app.services.milvus_service import search_vectors
 from app.services.query_rewrite import rewrite_query
@@ -260,7 +260,7 @@ async def stream_chat_response(
     # 0. 答案级缓存（Q8.1 MVP）：在链路最前端尝试命中。
     # 命中则直接流式返回缓存答案，跳过查询改写+向量检索+LLM 生成（整条链路最大头的开销）。
     # scope 按知识库集合隔离；命中时 SSE 带 cache_hit 标记，计费记 0（不调用 LLM）。
-    scope_key = build_answer_scope(kb_ids)
+    scope_key = await resolve_scope(kb_ids)
     cache_result = await lookup_answer(scope_key, question)
     if cache_result.answer is not None:
         yield {"type": "source", "chunks": [], "cache_hit": True}

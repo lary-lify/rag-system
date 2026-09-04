@@ -14,8 +14,9 @@ scope 隔离：按知识库集合（kb_ids 排序）成键。同一 KB 集合下
 命中——因为 RAG 答案本质是「问题 + 该 KB 内容」的纯函数，共享既正确又最大化命中率。
 仅当 kb_ids 非空且本次检索到片段时才写回，避免把「知识库无相关信息」这类拒答固化进缓存。
 
-陈旧性：TTL 是答案陈旧的上界。KB 内容更新后，旧答案最多存活 CACHE_ANSWER_TTL 秒，
-之后自然失效重新生成。MVP 不接文档级失效（那需要写时反查受影响问题，复杂度高）。
+陈旧性：TTL 是答案陈旧的上界。此外已接「文档级即时失效」——每个 KB 有一个世代计数器
+（kb_epoch），文档上传完成（向量进入 Milvus）或删除时自增该计数器，答案缓存 scope 把
+epoch 编进去，旧 scope 的答案立即查不到、新查询走新 scope，把 TTL 窗口内的陈旧风险压到 0。
 
 语义向量池：每个 scope 维护一个「近期 query 向量」有界队列（FIFO），落缓存后端。
 命中时只在池内扫描，不枚举全量缓存，复杂度 O(pool_size)。池仅用于召回增强，丢失
@@ -48,15 +49,57 @@ def normalize_query(q: str) -> str:
 
 
 def build_answer_scope(kb_ids: Optional[list[int]]) -> str:
-    """按知识库集合成 scope 键。
+    """按知识库集合成 scope 键（epoch=0 基线，仅供测试/兼容）。
 
     排序保证 {1,2} 与 {2,1} 等价；空集合记为 kb:none（此时调用方应禁止写缓存，
     因为无 KB 的闲聊答案还依赖多轮历史，不在键内，跨对话共享会串味）。
+    生产路径请用 `resolve_scope`（含 KB 世代）。
     """
     if not kb_ids:
         return "kb:none"
     s = ",".join(str(k) for k in sorted(set(int(k) for k in kb_ids)))
     return f"kb:{s}"
+
+
+# ---- KB 世代计数（文档级即时失效）----
+# 每个 KB 一个自增计数器，存于与答案缓存同一后端（memory / redis 共享）。
+# 文档内容变化（上传完成 / 删除）时自增该 KB 的 epoch，resolve_scope 把 epoch 编进
+# scope 键，于是旧 scope（含旧 epoch）的答案立即查不到，新查询走新 scope——比纯 TTL
+# 失效快且确定，彻底消除「改了知识库、旧答案还在被命中」的窗口。
+
+async def get_kb_epoch(kb_id: int) -> int:
+    """返回 KB 当前世代（未设置则 0）。"""
+    val = answer_cache.get(f"epoch:{kb_id}")
+    if isinstance(val, (int, float)):
+        return int(val)
+    return 0
+
+
+async def bump_kb_epoch(kb_id: int) -> int:
+    """文档内容变化（上传完成 / 删除）时调用：自增该 KB 世代，使旧 scope 答案缓存失效。
+
+    用 answer_cache 同一后端存储，多 worker 共享；INCR 原子保证并发增删改不丢代次。
+    任何异常降级为返回 0（scope 退化为不编 epoch，旧 TTL 行为仍兜底，不崩主流程）。
+    """
+    try:
+        return int(answer_cache.incr(f"epoch:{kb_id}"))
+    except Exception as e:
+        logger.warning(f"[answer-cache] bump_kb_epoch failed (kb={kb_id}): {e}")
+        return 0
+
+
+async def resolve_scope(kb_ids: Optional[list[int]]) -> str:
+    """含 KB 世代的 scope 键：任一 KB 内容变更后，旧 scope 自然失效，新查询走新 scope。
+
+    空集合记为 kb:none（调用方据此禁止写缓存，理由同 build_answer_scope）。
+    """
+    if not kb_ids:
+        return "kb:none"
+    parts = []
+    for kb_id in sorted(set(int(k) for k in kb_ids)):
+        epoch = await get_kb_epoch(kb_id)
+        parts.append(f"{kb_id}@{epoch}")
+    return "kb:" + ",".join(parts)
 
 
 def _exact_key(scope_key: str, norm_q: str) -> str:

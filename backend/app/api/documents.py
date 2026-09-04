@@ -354,6 +354,15 @@ async def delete_document(
             import logging
             logging.getLogger(__name__).warning(f"[delete] Milvus cleanup failed for doc {document_id}: {e}")
 
+    # 知识库内容已删除（片段从向量库移除，检索结果会变）→ 使该 KB 答案缓存失效。
+    try:
+        from app.services.answer_cache import bump_kb_epoch
+
+        await bump_kb_epoch(doc.kb_id)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[delete] bump_kb_epoch failed (kb={doc.kb_id}): {e}")
+
     return {"detail": "Document soft-deleted", "id": doc.id}
 
 
