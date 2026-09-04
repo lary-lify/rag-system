@@ -33,7 +33,8 @@
 - **引用溯源**：返回召回 chunk 来源，便于核对答案依据
 
 ### 计费与报表
-- **Token 用量记录**：按用户/会话/模型多维度记录 `input` / `output` / `total`
+- **Token 用量记录**：按用户/会话/模型多维度记录 `input` / `output` / `total`；`token_usage` 表新增 `cache_hit` 列，标记该次 chat 计费是否来自答案缓存命中（命中时 token/cost 记 0，跳过改写+检索+LLM）
+- **命中可量化对账**：`GET /api/reports/cost-summary` 返回 `total_cache_hits`（chat 命中次数）并按用户/KB 统计 `cache_hits`；`GET /api/reports/usage-trend` 增加每日 `cache_hits[]` 折线，可直接看「省了多少次 LLM 调用 / 多少 ¥」
 - **用量汇总**：由 `app/services/daily_summary.py` 写入三张按日汇总表 `daily_token_summary`（Token/费用/请求数）、`daily_qa_summary`（问答统计）、`daily_hot_questions`（热门问题）。内置调度器默认启用（`DAILY_SUMMARY_ENABLED=true`），每日本地时间 `DAILY_SUMMARY_HOUR`（默认 2 点）汇总前一天；写入为 `ON DUPLICATE KEY UPDATE` 幂等，多 worker 重复触发无害。也可关闭内置调度器、由超管调用 `POST /api/reports/trigger-summary` 或外部 cron 手动触发
 - **报表与导出**：对话记录导出 Excel，含 Token 明细
 
