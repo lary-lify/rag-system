@@ -15,6 +15,7 @@ from sqlalchemy import select
 from app.clients.http_client import http_client_context
 from app.core.cache import make_cache_key, query_rewrite_cache
 from app.core.config import settings
+from app.services.answer_cache import build_answer_scope, lookup_answer, store_answer
 from app.services.embedding_service import embed_single_text, estimate_token_count
 from app.services.milvus_service import search_vectors
 from app.services.query_rewrite import rewrite_query
@@ -256,6 +257,24 @@ async def stream_chat_response(
     
     All token counts are recorded to DB for billing.
     """
+    # 0. 答案级缓存（Q8.1 MVP）：在链路最前端尝试命中。
+    # 命中则直接流式返回缓存答案，跳过查询改写+向量检索+LLM 生成（整条链路最大头的开销）。
+    # scope 按知识库集合隔离；命中时 SSE 带 cache_hit 标记，计费记 0（不调用 LLM）。
+    scope_key = build_answer_scope(kb_ids)
+    cache_result = await lookup_answer(scope_key, question)
+    if cache_result.answer is not None:
+        yield {"type": "source", "chunks": [], "cache_hit": True}
+        yield {"type": "token", "content": cache_result.answer}
+        yield {
+            "type": "usage",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_hit": True,
+        }
+        return
+    # 未命中：lookup 顺带算出的查询向量留待写回语义池复用，避免重复 embedding
+    query_vec_for_store = cache_result.query_vec
+
     # 1. Build context from KB retrieval
     context_parts = []
     source_chunks_data = []
@@ -314,6 +333,7 @@ async def stream_chat_response(
     # 3. Call DeepSeek streaming API
     input_tokens_est = sum(estimate_token_count(m["content"]) for m in messages)
     output_tokens_total = 0
+    answer_text = ""  # 累积完整答案，用于命中后写回答案缓存
 
     try:
         async with http_client_context() as client:
@@ -350,6 +370,7 @@ async def stream_chat_response(
                     content = choices[0].get("delta", {}).get("content", "")
                     if content:
                         output_tokens_total += estimate_token_count(content)
+                        answer_text += content
                         yield {"type": "token", "content": content}
                 except json.JSONDecodeError:
                     continue
@@ -374,9 +395,27 @@ async def stream_chat_response(
         logger.error(f"[llm] Unexpected error: {e}")
         yield {"type": "token", "content": "\n\n**错误：系统异常，请稍后重试**"}
 
-    # 4. Final usage event
+    # 4. 写回答案缓存（仅当命中 KB 且检索到片段，且非错误串：避免缓存拒答/错误/闲聊跨对话串味）
+    if (
+        kb_ids
+        and source_chunks_data
+        and answer_text
+        and not answer_text.strip().startswith("**错误")
+    ):
+        try:
+            await store_answer(
+                scope_key,
+                cache_result.norm_q,
+                answer_text,
+                query_vec=query_vec_for_store,
+            )
+        except Exception as e:
+            logger.warning(f"[llm] answer cache store failed (non-fatal): {e}")
+
+    # 5. Final usage event
     yield {
         "type": "usage",
         "input_tokens": input_tokens_est,
         "output_tokens": output_tokens_total,
+        "cache_hit": False,
     }

@@ -83,6 +83,25 @@ class Settings(BaseSettings):
     # 连不上 Redis 时自动降级 memory 并告警，不阻塞启动。
     CACHE_BACKEND: Literal["memory", "redis"] = "redis"  # type: ignore[assignment]
 
+    # ---- 答案级缓存（Q8.1，SSE 对话链路）----
+    # 是否启用「问题→答案」答案级缓存。命中后跳过查询改写+向量检索+LLM 生成，
+    # 直接流式返回，是整条链路里最靠前的热点复用（整段答案复用，而非单条 embedding）。
+    # scope 按知识库集合（kb_ids 排序）隔离：同一 KB 集合下不同用户/对话共享命中，
+    # 因为 RAG 答案本质是「问题+该 KB 内容」的纯函数，共享既正确又最大化命中率。
+    # 仅当 kb_ids 非空且本次检索到片段时才写回，避免把「知识库无相关信息」类拒答固化进缓存。
+    CACHE_ANSWER_ENABLED: bool = True
+    # 答案缓存 TTL（秒）。TTL 也是陈旧上界：KB 内容更新后旧答案最多存活这么久再自然失效。
+    CACHE_ANSWER_TTL: float = 3600.0
+    # 语义命中余弦阈值。查询向量与近期 query 向量池中最近一条的余弦相似度 >= 该值即判命中，
+    # 用于捕捉同义改写（如「怎么退款」vs「退款流程」）。text-embedding-v3 1024 维下 0.92 较严，
+    # 调太低会把语义相近但答案不同的问题误判命中。
+    ANSWER_SEMANTIC_THRESHOLD: float = 0.92
+    # 每个 scope 的语义向量池上限（条），超过按 FIFO 淘汰最旧。池落缓存后端，单条含
+    # 1024 维向量，故不宜过大：64 条约 64×(答案几 KB+向量~9KB)≈1MB/scope。
+    ANSWER_SEMANTIC_POOL_MAX: int = 64
+    # 答案缓存 facade 容量（精确命中键数量上限，TTL+容量双约束）。
+    ANSWER_CACHE_MAX_SIZE: int = 2000
+
     # ---- 日报定时汇总（内置调度器，可选）----
     # 是否启用内置调度器每日触发 daily_summary 三张表汇总。
     # 关闭后也可由外部 cron 定时调 POST /api/reports/trigger-summary 达到同样效果。

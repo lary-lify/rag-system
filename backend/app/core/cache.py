@@ -393,10 +393,17 @@ query_rewrite_cache = Cache(
     max_size=1000,
     ttl=3600.0,
 )
+# 答案级缓存（Q8.1）：复用同一 Cache 外观，后端随 CACHE_BACKEND 切换。
+# 容量/ TTL 由 configure_caches() 按配置刷新；精确键走此实例，语义向量池也存于此后端。
+answer_cache = Cache(
+    name="answer",
+    max_size=2000,
+    ttl=3600.0,
+)
 
 
 def all_caches() -> list[Cache]:
-    return [embedding_cache, query_rewrite_cache]
+    return [embedding_cache, query_rewrite_cache, answer_cache]
 
 
 _redis_client: Any = None
@@ -412,6 +419,7 @@ async def configure_caches() -> None:
 
     embedding_cache.configure(settings.EMBEDDING_CACHE_MAX_SIZE, settings.EMBEDDING_CACHE_TTL)
     query_rewrite_cache.configure(settings.QUERY_REWRITE_CACHE_MAX_SIZE, settings.QUERY_REWRITE_CACHE_TTL)
+    answer_cache.configure(settings.ANSWER_CACHE_MAX_SIZE, settings.CACHE_ANSWER_TTL)
 
     backend = str(getattr(settings, "CACHE_BACKEND", "memory")).lower()
     if backend == "redis":
@@ -430,11 +438,13 @@ async def configure_caches() -> None:
                 _redis_client = client
                 embedding_cache.enable_redis(client)
                 query_rewrite_cache.enable_redis(client)
+                answer_cache.enable_redis(client)
                 logger.info(f"[cache] 后端=redis ({settings.REDIS_URL})，多副本共享缓存已启用")
             except Exception as e:
                 logger.error(f"[cache] 连接 Redis 失败，降级为进程内缓存: {e}")
                 embedding_cache.disable_redis()
                 query_rewrite_cache.disable_redis()
+                answer_cache.disable_redis()
     else:
         embedding_cache.disable_redis()
         query_rewrite_cache.disable_redis()
